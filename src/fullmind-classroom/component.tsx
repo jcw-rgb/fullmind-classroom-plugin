@@ -28,6 +28,11 @@ interface FullmindClassroomProps {
 // the browser console to just Fullmind output when debugging in a live room.
 const LOG = '[Fullmind]';
 
+// BBB icon-set name, defined once so the toast and the menu item never drift.
+// 'user' is the known-good name from the SDK docs — swap to a fitting Fullmind
+// icon here (one place) once confirmed against the icon set.
+const FULLMIND_ICON = 'user';
+
 function FullmindClassroom(
   { pluginUuid }: FullmindClassroomProps,
 ): React.ReactElement<FullmindClassroomProps> {
@@ -60,11 +65,8 @@ function FullmindClassroom(
   ): void => {
     pluginApi.uiCommands.notification.send({
       type,
-      // `icon` is a BBB icon-set name; 'user' is the known-good name from the SDK
-      // docs. Swap to a more fitting Fullmind icon once confirmed against the set.
-      icon: 'user',
+      icon: FULLMIND_ICON,
       message,
-      small: false,
     });
   };
 
@@ -73,16 +75,19 @@ function FullmindClassroom(
   // it reads the live user/meeting data and fires a branded toast. This is how
   // you confirm the whole pipeline (load → run → read → render) works in a room.
   //
-  // Re-registering when the data changes is intentional: setOptionsDropdownItems
-  // REPLACES the item list (it does not append), so the onClick closure always
-  // sees the freshest user/meeting values.
+  // setOptionsDropdownItems REPLACES the item list, so we must NOT re-run it on
+  // every render. The SDK data hooks hand back a NEW object reference on every
+  // core data push, so depending on `currentUser`/`meeting` directly would re-
+  // register the item constantly (thrash). Depend on the stable PRIMITIVE fields
+  // we actually display instead — the effect then only re-runs when a shown
+  // value genuinely changes, and the closure captures the matching values.
   useEffect(() => {
     pluginLogger.info(`${LOG} FullmindClassroom mounted — pipeline is LIVE.`);
 
     pluginApi.setOptionsDropdownItems([
       new OptionsDropdownOption({
         label: 'Fullmind — test connection',
-        icon: 'user',
+        icon: FULLMIND_ICON,
         onClick: () => {
           pluginLogger.info(`${LOG} current user:`, currentUser);
           pluginLogger.info(`${LOG} meeting:`, meeting);
@@ -96,7 +101,7 @@ function FullmindClassroom(
         },
       }),
     ]);
-  }, [currentUser, meeting]);
+  }, [currentUser?.userId, currentUser?.name, currentUser?.role, meeting?.name]);
 
   // Foundation renders no visible DOM of its own — features add their own UI
   // through the SDK's extensible areas. Returning null is correct here.
