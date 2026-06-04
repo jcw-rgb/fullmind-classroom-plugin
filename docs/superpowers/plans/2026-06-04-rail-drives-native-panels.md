@@ -416,12 +416,18 @@ In `manifest.json`, change `"version": "0.0.4"` → `"version": "0.0.5"`. (DEV-H
 Run: `npx tsc --noEmit && npm run lint && npm run build-bundle`
 Expected: tsc zero errors; lint zero errors (pre-existing warnings tolerable); webpack writes `dist/FullmindClassroom.js` + `dist/manifest.json` with no build errors.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Commit (version bump only — NOT dist/)**
+
+`dist/` is gitignored and never tracked; the bundle is rebuilt and uploaded to S3 at
+deploy time, not committed. Commit only the version bump + README:
 
 ```bash
-git add manifest.json dist/
-git commit -m "build(rail): bundle v0.0.5 — native-panel launcher"
+git add manifest.json src/fullmind-classroom/features/README.md
+git commit -m "build(rail): bump manifest to v0.0.5 — native-panel launcher"
 ```
+
+The freshly-built `dist/FullmindClassroom.js` + `dist/manifest.json` remain on disk for
+the manual S3 upload (per DEV-HANDOFF.md).
 
 ---
 
