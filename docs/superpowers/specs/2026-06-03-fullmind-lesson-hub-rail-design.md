@@ -27,9 +27,15 @@ fixed`). So we draw the rail ourselves.
    gives no feed of edits to count; Class has no natural unread meaning).
 
 ## Architecture
-- **One new component, `lesson-hub-rail.tsx`**, registers a single invisible
+- **Two floating windows now coexist** (progress bar + rail). Since `setFloatingWindows`
+  is last-writer-wins per plugin, ONE registrar must own it. So the progress bar is
+  refactored to **export its window descriptor** (`makeSessionProgressWindow`) instead of
+  self-registering, and a small `register-floating-windows.tsx` calls
+  `setFloatingWindows([progressBarWindow, lessonHubWindow])` once. (Same hub discipline
+  as the deleted panel hub — it just moves to the floating-windows setter.)
+- **The rail itself, `lesson-hub-rail.tsx`**, exports `makeLessonHubWindow` — an invisible
   `FloatingWindow` (`movable:false`, transparent, no shadow — exactly as the progress bar
-  hides its window chrome). Its content is a `position: fixed` overlay rendering:
+  hides its window chrome) whose content is the fixed-overlay rail. Its content is a `position: fixed` overlay rendering:
   - the prototype `.iconrail` (three SVG buttons: Chat / Notes / Class), docked left, and
   - a sliding panel that shows the active tab's body.
   The component owns its **own open/close + active-tab state** (click a button → open that
@@ -60,9 +66,11 @@ These reach into BBB's hashed layout and are tuned once in the test room:
 | `features/class-panel.tsx` | Keep `ClassPanelView`; **remove** `makeClassArea` |
 | `features/notes-panel.tsx` | Keep `NotesPanelView`; **remove** `makeNotesArea` |
 | `features/register-panels.tsx` | **DELETE** — sidekick hub no longer used |
+| `features/session-progress-bar.tsx` | Refactor: export `makeSessionProgressWindow`; stop self-registering. View/timing unchanged |
+| `features/register-floating-windows.tsx` | **NEW** — single `setFloatingWindows([progressBar, rail])` caller |
 | `features/theme.ts` | Unchanged (reused) |
 | `features/font-size-reorder.tsx` | Unchanged (independent) |
-| `component-working.tsx` | Render `<LessonHubRail>` in place of `<RegisterPanels>` |
+| `component-working.tsx` | Render `<RegisterFloatingWindows>` + foundation + font-size (no `<RegisterPanels>`, no `<SessionProgressBar>`) |
 | `manifest.json` | Bump `0.0.3 → 0.0.4` (busts cached bundle) |
 | `src/preview/*` | Update the preview to render the real rail + push behavior with mock data |
 
