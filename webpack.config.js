@@ -30,6 +30,13 @@ module.exports = {
         res.sendFile(path.resolve(__dirname, 'manifest.json'));
       });
 
+      // Serve the Fullmind BBB reskin stylesheet from the project root, so it can
+      // be loaded into a room via the bbb_custom_style_url join param (same host
+      // as the plugin). Mirrors the manifest.json route above.
+      devServer.app.get('/fullmind-bbb-base.css', (req, res) => {
+        res.sendFile(path.resolve(__dirname, 'fullmind-bbb-base.css'));
+      });
+
       return middlewares;
     },
   },

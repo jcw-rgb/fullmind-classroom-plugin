@@ -1,6 +1,8 @@
 node_modules
 dist
+dist-preview
 dist-tsc
+.DS_Store
 debian/.debhelper/
 debian/debhelper-build-stamp
 debian/files
