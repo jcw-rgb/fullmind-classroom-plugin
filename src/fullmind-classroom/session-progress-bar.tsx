@@ -5,7 +5,6 @@ import {
   BbbPluginSdk,
   PluginApi,
   FloatingWindow,
-  pluginLogger,
 } from 'bigbluebutton-html-plugin-sdk';
 
 /**
@@ -29,8 +28,6 @@ import {
  *     ReactDOM root — which is how the bar updates itself without us having to
  *     re-register it on every tick.
  */
-
-const LOG = '[Fullmind]';
 
 // ── Fullmind brand tokens (mirror KNOWLEDGE.md §5 + the design system) ────────
 // Kept local to this feature so it stays a self-contained drop-in file.
@@ -82,7 +79,7 @@ const PULSE_KEYFRAMES = `
  * The bar itself. Rendered into the floating window's detached root, so it owns
  * its own subscription + 1s tick and re-renders in place as time advances.
  */
-function SessionProgressView(
+export function SessionProgressView(
   { pluginUuid }: { pluginUuid: string },
 ): React.ReactElement | null {
   BbbPluginSdk.initialize(pluginUuid); // idempotent — just (re)binds the api handle
@@ -217,41 +214,18 @@ function SessionProgressView(
   );
 }
 
-/**
- * The registrar. Registers the floating window exactly once on mount; the view
- * above keeps itself current. Renders no DOM of its own.
- */
-function SessionProgressBar(
-  { pluginUuid }: { pluginUuid: string },
-): null {
-  BbbPluginSdk.initialize(pluginUuid);
-  const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
-
-  useEffect(() => {
-    pluginLogger.info(`${LOG} Session Progress bar — registering floating window.`);
-
-    pluginApi.setFloatingWindows([
-      new FloatingWindow({
-        id: 'fullmind-session-progress',
-        top: 0,
-        left: 0,
-        movable: false,
-        backgroundColor: 'transparent',
-        boxShadow: 'none',
-        // BBB calls this once to mount our content. We own the root it returns.
-        contentFunction: (element: HTMLElement): ReactDOM.Root => {
-          const root = ReactDOM.createRoot(element);
-          root.render(<SessionProgressView pluginUuid={pluginUuid} />);
-          return root;
-        },
-      }),
-    ]);
-    // Register once for the component's life. `pluginApi`/`pluginUuid` are stable
-    // (the api is a singleton keyed by uuid on window), so re-running would only
-    // thrash the floating-window registration.
-  }, []);
-
-  return null;
+export function makeSessionProgressWindow(pluginUuid: string): FloatingWindow {
+  return new FloatingWindow({
+    id: 'fullmind-session-progress',
+    top: 0,
+    left: 0,
+    movable: false,
+    backgroundColor: 'transparent',
+    boxShadow: 'none',
+    contentFunction: (element: HTMLElement): ReactDOM.Root => {
+      const root = ReactDOM.createRoot(element);
+      root.render(<SessionProgressView pluginUuid={pluginUuid} />);
+      return root;
+    },
+  });
 }
-
-export default SessionProgressBar;
