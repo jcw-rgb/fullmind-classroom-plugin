@@ -1,26 +1,24 @@
 import * as React from 'react';
 import FullmindClassroom from './component';
 import SessionProgressBar from './session-progress-bar';
+import RegisterPanels from './features/register-panels';
+import FontSizeReorder from './features/font-size-reorder';
 
 /**
  * FullmindClassroomWorking — the WORKING build of the plugin.
  *
- * This is the file the entrypoint renders so real features run in the room. It
- * deliberately does NOT replace the template: it renders the untouched
- * foundation (`./component` — all the core SDK plumbing + proof-of-life menu
- * item) and layers each shipped feature beside it as a sibling.
- *
- * Adding a feature = import it and drop one more sibling in here. The foundation
- * (`component.tsx`) stays the clean, minimal template it was always meant to be.
- *
- * Why siblings work: every component calls `BbbPluginSdk.initialize(uuid)`, which
- * just (re)binds the api handle on `window.bbb_plugins[uuid]` — idempotent. And
- * the foundation registers an Options-menu item while the bar registers a
- * floating window; those are independent setters, so they never clobber each
- * other.
+ * Renders the untouched foundation (./component) and layers each shipped feature as
+ * a sibling. Each component calls BbbPluginSdk.initialize(uuid) (idempotent), and
+ * each feature owns a DIFFERENT registration surface, so they never clobber:
+ *   • foundation        → setOptionsDropdownItems (proof-of-life menu item)
+ *   • progress bar      → setFloatingWindows (its own floating window)
+ *   • RegisterPanels    → setGenericContentItems (the three sidebar panels, ONE call)
+ *   • FontSizeReorder   → DOM only (no SDK setter)
  *
  * Shipped features:
  *   • Session Progress bar (prototype pin 4) — ./session-progress-bar
+ *   • Sidebar panels: Chat / Notes / Class    — ./features/register-panels
+ *   • Font-size reorder (Settings)            — ./features/font-size-reorder
  */
 function FullmindClassroomWorking(
   { pluginUuid }: { pluginUuid: string },
@@ -29,6 +27,8 @@ function FullmindClassroomWorking(
     <>
       <FullmindClassroom pluginUuid={pluginUuid} />
       <SessionProgressBar pluginUuid={pluginUuid} />
+      <RegisterPanels pluginUuid={pluginUuid} />
+      <FontSizeReorder />
     </>
   );
 }
