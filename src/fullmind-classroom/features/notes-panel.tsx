@@ -1,8 +1,6 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
-  BbbPluginSdk,
-  PluginApi,
   GenericContentSidekickArea,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
@@ -24,10 +22,7 @@ const NOTES_PAD_URL = '';
 
 const NOTES_ICON = 'copy';
 
-function NotesPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
-  BbbPluginSdk.initialize(pluginUuid);
-  const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
-
+function NotesPanelView(): React.ReactElement {
   if (NOTES_PAD_URL) {
     return (
       <iframe
@@ -45,23 +40,20 @@ function NotesPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElem
     >
       <div style={{ fontSize: 14, fontWeight: 700 }}>Lesson Notes</div>
       <div style={{ fontSize: 13, color: FM.inkDim, lineHeight: 1.5 }}>
-        The educator&apos;s shared notes open in the live room. Use BBB&apos;s Shared
-        Notes below.
+        The educator&apos;s notes are BBB&apos;s Shared Notes.
+        To open them, use the
+        {' '}
+        <strong style={{ color: FM.ink }}>Shared Notes</strong>
+        {' '}
+        button in BBB&apos;s own controls at the bottom of the screen.
       </div>
-      <button
-        type="button"
-        onClick={() => pluginApi.uiCommands.sidekickOptionsContainer.open()}
-        style={{
-          background: FM.coral, color: '#fff', border: 0, borderRadius: 10, padding: '10px 16px', fontFamily: FM.font, fontWeight: 700, cursor: 'pointer',
-        }}
-      >
-        Open Shared Notes
-      </button>
     </div>
   );
 }
 
-export function makeNotesArea(pluginUuid: string): GenericContentSidekickArea {
+// pluginUuid kept for API symmetry with makeChatArea / makeSessionProgressBar
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
+export function makeNotesArea(_pluginUuid: string): GenericContentSidekickArea {
   return new GenericContentSidekickArea({
     name: 'Notes',
     section: 'Fullmind',
@@ -69,7 +61,7 @@ export function makeNotesArea(pluginUuid: string): GenericContentSidekickArea {
     open: false,
     contentFunction: (element: HTMLElement): ReactDOM.Root => {
       const root = ReactDOM.createRoot(element);
-      root.render(<NotesPanelView pluginUuid={pluginUuid} />);
+      root.render(<NotesPanelView />);
       return root;
     },
   });

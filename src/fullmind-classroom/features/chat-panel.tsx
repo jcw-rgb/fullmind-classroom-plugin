@@ -1,5 +1,7 @@
 import * as React from 'react';
-import { useMemo, useState } from 'react';
+import {
+  useEffect, useMemo, useRef, useState,
+} from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
@@ -36,6 +38,14 @@ function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactEleme
     return map;
   }, [users]);
 
+  // Auto-scroll to the newest message whenever the message count changes.
+  const listRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (listRef.current) {
+      listRef.current.scrollTop = listRef.current.scrollHeight;
+    }
+  }, [messages.length]);
+
   const send = () => {
     const text = draft.trim();
     if (!text) return;
@@ -50,9 +60,11 @@ function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactEleme
       display: 'flex', flexDirection: 'column', height: '100%', fontFamily: FM.font, color: FM.ink,
     }}
     >
-      <div style={{
-        flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
-      }}
+      <div
+        ref={listRef}
+        style={{
+          flex: 1, overflowY: 'auto', padding: '12px 14px', display: 'flex', flexDirection: 'column', gap: 10,
+        }}
       >
         {messages.length === 0 && (
           <div style={{ color: FM.inkDim, fontSize: 13 }}>No messages yet.</div>
