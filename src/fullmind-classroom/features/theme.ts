@@ -15,5 +15,7 @@ export const FM = {
   steel: '#6EA3BE',
   success: '#198754',
   warning: '#FFC107',
+  gray100: '#F8F9FA',
+  ink2: '#495057',
   font: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
 };
