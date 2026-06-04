@@ -1,39 +1,39 @@
 import * as React from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
   PluginApi,
   FloatingWindow,
-  UserListUiDataNames,
-  LayoutPresentatioAreaUiDataNames,
-  UiLayouts,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
 
 /**
  * Lesson Hub rail — the prototype's left .iconrail (Chat / Notes / Class), drawn by
- * the plugin as a fixed-position overlay inside an invisible FloatingWindow. The rail
- * does NOT rebuild the panels: each button LAUNCHES BBB's own native panel, which the
- * Fullmind CSS reskins. One chat, not two.
+ * the plugin as a fixed overlay inside an invisible FloatingWindow. The rail is the
+ * SOLE nav: it hides BBB's native combined sidebar and drives BBB's own panels.
+ *
+ * BBB reality (confirmed from the live DOM): the left column [userListContainer] is a
+ * SINGLE sidebar stacking three sections — Messages (chat list), Notes (shared-notes),
+ * Users (roster). There are no three separately-toggled panels. So:
  *   • Chat  → pluginApi.uiCommands.chat.form.open()  (SDK; open-only)
- *   • Class → click BBB's native [data-test="toggleUserList"]
- *   • Notes → click BBB's native Shared-Notes toggle (CONFIRM selector live)
- * Active highlight: Class/Notes read native UI-data; Chat is best-effort click-tracking
- * (reliable because the native chat/user-list toggles are hidden — see RAIL_LAYOUT_STYLE).
+ *   • Notes → click BBB's native [data-test="sharedNotesButton"]
+ *   • Class → reveal the native sidebar but CSS-hide its Messages + Notes sections,
+ *             leaving the roster only (BBB keeps the roster inside this sidebar).
+ *
+ * Highlight: a single local `active` tab. Because the rail is the only nav (native
+ * sidebar hidden), local state is authoritative — exactly one highlight at a time.
  */
 
-// ── LIVE-WIRE: BBB layout (CONFIRM IN LIVE ROOM) ─────────────────────────────
-// Native Shared-Notes toggle to click for the Notes tab. Best guess below.
-const SHARED_NOTES_TOGGLE = '[data-test="sharedNotesButton"]'; // CONFIRM
-// Native chat panel close control, for Chat toggle parity (chat.form.open is open-only).
-// querySelector returns the first DOM match — closePrivateChat takes priority over hidePublicChat.
-const CHAT_CLOSE_SELECTOR = '[data-test="closePrivateChat"], [data-test="hidePublicChat"]'; // CONFIRM
-// BBB's sidebar/panel container to shift right by the rail width so it sits beside us.
-const NATIVE_SIDEBAR_CONTAINER = '[data-test="userListContent"]'; // CONFIRM (the panel column)
-// Native toggles to hide so the rail is the single nav (still .click()-able while hidden).
-const NATIVE_USERLIST_TOGGLE = '[data-test="toggleUserList"]'; // CONFIRM
-const NATIVE_CHAT_TOGGLE = '[data-test="chatButton"]'; // CONFIRM
+// ── BBB layout hooks ─────────────────────────────────────────────────────────
+// Confirmed from the live DOM (2026-06-04):
+const SIDEBAR_CONTAINER = '[data-test="userListContainer"]'; // the whole Messages/Notes/Users column
+const SIDEBAR_CONTENT = '[data-test="userListContent"]';
+const MESSAGES_TITLE = '[data-test="messageTitle"]'; // marks the Messages section
+const NOTES_TITLE = '[data-test="notesTitle"]'; // marks the Notes section
+const SHARED_NOTES_TOGGLE = '[data-test="sharedNotesButton"]'; // opens/closes Shared Notes
+// Only appears once the chat panel is open, so confirm live:
+const CHAT_CLOSE_SELECTOR = '[data-test="hidePublicChat"], [data-test="closePrivateChat"]'; // CONFIRM
 
 const RAIL_TOP = 92; // CONFIRM (BBB nav height in px)
 const RAIL_WIDTH = 64; // prototype .iconrail width
@@ -76,11 +76,14 @@ function parseTime(v: string): number {
   return Date.parse(v); // ISO 8601
 }
 
-// Shift BBB's native sidebar beside the rail; hide BBB's native chat/user-list toggles
-// so the rail is the single nav. display:none still allows programmatic .click().
+// Hide BBB's native combined sidebar by default; the rail is the sole nav. When the
+// Class tab is active, reveal the sidebar but hide its Messages + Notes sections via
+// :has() so only the roster shows, shifted right of the rail.
 const RAIL_LAYOUT_STYLE = `
-  ${NATIVE_SIDEBAR_CONTAINER} { margin-left: ${RAIL_WIDTH}px !important; }
-  ${NATIVE_USERLIST_TOGGLE}, ${NATIVE_CHAT_TOGGLE} { display: none !important; }
+  body:not(.fm-class-active) ${SIDEBAR_CONTAINER} { display: none !important; }
+  body.fm-class-active ${SIDEBAR_CONTAINER} { margin-left: ${RAIL_WIDTH}px !important; }
+  body.fm-class-active ${SIDEBAR_CONTENT} > div:has(${MESSAGES_TITLE}),
+  body.fm-class-active ${SIDEBAR_CONTENT} > div:has(${NOTES_TITLE}) { display: none !important; }
 `;
 
 function clickNative(selector: string): void {
@@ -92,48 +95,47 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 
-  // Best-effort chat-open tracking (no SDK is-open read for chat). Known gap: if the
-  // user closes the native chat panel via its in-panel ✕ (not the rail button),
-  // chatOpen stays true until they click the Chat rail button again. Accepted until
-  // the SDK exposes a chat-is-open data hook.
-  const [chatOpen, setChatOpen] = useState(false);
+  // Single local active tab — authoritative because the rail is the only nav.
+  const [active, setActive] = useState<Tab | null>(null);
   const [lastChatOpenedAt, setLastChatOpenedAt] = useState<number>(() => Date.now());
 
-  // Native panel state (clean reads).
-  const userList = pluginApi.useUiData(UserListUiDataNames.USER_LIST_IS_OPEN, { value: false });
-  const presentationEls = pluginApi.useUiData(LayoutPresentatioAreaUiDataNames.CURRENT_ELEMENT, []);
-  const userListOpen = userList?.value ?? false;
-  const notesOpen = (presentationEls ?? []).some(
-    (e) => e.currentElement === UiLayouts.PINNED_SHARED_NOTES && e.isOpen,
-  );
+  // Class tab drives a body class that reveals the roster-only native sidebar.
+  useEffect(() => {
+    document.body.classList.toggle('fm-class-active', active === 'class');
+    return () => document.body.classList.remove('fm-class-active');
+  }, [active]);
 
   // Unread badge: messages since Chat was last opened.
   const chatResponse = pluginApi.useLoadedChatMessages();
   const messages = chatResponse?.data ?? [];
-  const unread = chatOpen
+  const unread = active === 'chat'
     ? 0
     : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
 
-  const isActive = (tab: Tab): boolean => {
-    if (tab === 'chat') return chatOpen;
-    if (tab === 'class') return userListOpen;
-    return notesOpen;
+  // Open/close BBB's native panel for a tab. Class is CSS-only (handled by the effect).
+  const openNative = (tab: Tab): void => {
+    if (tab === 'chat') {
+      pluginApi.uiCommands.chat.form.open();
+      setLastChatOpenedAt(Date.now());
+    } else if (tab === 'notes') {
+      clickNative(SHARED_NOTES_TOGGLE);
+    }
+  };
+  const closeNative = (tab: Tab): void => {
+    if (tab === 'chat') clickNative(CHAT_CLOSE_SELECTOR);
+    else if (tab === 'notes') clickNative(SHARED_NOTES_TOGGLE); // toggles off
   };
 
   const handleClick = (tab: Tab): void => {
-    if (tab === 'chat') {
-      if (chatOpen) {
-        clickNative(CHAT_CLOSE_SELECTOR);
-        setChatOpen(false);
-      } else {
-        pluginApi.uiCommands.chat.form.open();
-        setChatOpen(true);
-        setLastChatOpenedAt(Date.now());
+    setActive((cur) => {
+      if (cur === tab) { // clicking the active tab closes it
+        closeNative(tab);
+        return null;
       }
-      return;
-    }
-    if (tab === 'class') clickNative(NATIVE_USERLIST_TOGGLE);
-    else clickNative(SHARED_NOTES_TOGGLE);
+      if (cur) closeNative(cur); // switching tabs: close the previous panel
+      openNative(tab);
+      return tab;
+    });
   };
 
   return (
@@ -163,7 +165,7 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
         }}
       >
         {TABS.map((tab) => {
-          const active = isActive(tab);
+          const isActive = active === tab;
           return (
             <button
               key={tab}
@@ -182,9 +184,9 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
                 alignItems: 'center',
                 gap: 4,
                 fontFamily: 'inherit',
-                background: active ? FM.coral : 'transparent',
-                color: active ? '#fff' : FM.ink2,
-                boxShadow: active ? '0 6px 14px -6px rgba(243,113,103,.6)' : 'none',
+                background: isActive ? FM.coral : 'transparent',
+                color: isActive ? '#fff' : FM.ink2,
+                boxShadow: isActive ? '0 6px 14px -6px rgba(243,113,103,.6)' : 'none',
               }}
             >
               {ICONS[tab]}

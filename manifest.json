@@ -1,6 +1,6 @@
 {
   "requiredSdkVersion": "~0.0.73",
   "name": "FullmindClassroom",
-  "version": "0.0.5",
+  "version": "0.0.6",
   "javascriptEntrypointUrl": "FullmindClassroom.js"
 }
