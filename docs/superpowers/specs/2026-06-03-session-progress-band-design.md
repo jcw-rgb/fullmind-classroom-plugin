@@ -52,7 +52,7 @@ Banner (`.banner`), left → right, vertically centered, `gap:14px`, `padding:0 
 | **Band background** | `--fm-plum-swatch` = `#3E3A6E` | the strip color |
 | **Label** | "Session Progress" | base `rgba(255,255,255,.55)`; second word bold white (`#fff`, 700); 14px leading icon, `gap:7px` |
 | **Track** (`.masterbar`) | `flex:1; height:9px; radius:999; bg rgba(255,255,255,.10)` | fills the middle, takes remaining width |
-| **Fill** (`.fill`) | `width:<live>%`; `linear-gradient(90deg, #F37167, #FF9A8E)`; glow `0 0 12px rgba(243,113,103,.5)`; `transition: width .5s cubic-bezier(.2,.8,.2,1)`; **sheen** shimmer sweep (2.6s) | the animated coral fill |
+| **Fill** (`.fill`) | `width:<live>%`; `linear-gradient(90deg, #F37167, #FF9A8E)`; glow `0 0 12px rgba(243,113,103,.5)`; `transition: width .5s cubic-bezier(.2,.8,.2,1)` | the coral fill. **Sheen sweep dropped** — see Animation & color, below |
 | **Percent** (`.b-pct`) | `font-weight:800; font-size:13px; #fff; min-width:38px; text-align:right` | e.g. `33%` |
 | **Time** (`.b-time`) | clock icon (14px, `opacity:.7`) + `MM:SS left`; `color rgba(255,255,255,.55); gap:6px` | e.g. `40:00 left` |
 
@@ -72,8 +72,8 @@ The data/logic is done; this is a **restyle + a layout-reservation rule**. Concr
 2. **Add the `%` readout** — the shipped bar has none; the prototype shows `33%`.
 3. **Time format → `MM:SS left`** — shipped bar rounds to "N min left"; prototype
    shows mm:ss. Reuse the existing `remainingMs`; format mm:ss instead of `ceil(min)`.
-4. **Fill gradient end `#FF9A8E`** (shipped uses `#F8A7A0`) + **sheen** shimmer sweep
-   (shipped has a pulse dot instead).
+4. **Fill gradient end `#FF9A8E`** (shipped uses `#F8A7A0`). **No sheen, no pulse, no
+   live dot** — the only motion is the fill edge advancing (see Animation & color).
 5. **Label** "Session Progress" (shipped shows uppercase "SESSION").
 6. **Band bg `--fm-plum-swatch #3E3A6E`** (shipped uses `rgba(64,55,112,.92)`).
 7. **Colors + height from CSS vars** with hardcoded fallback (single source of truth):
@@ -81,13 +81,21 @@ The data/logic is done; this is a **restyle + a layout-reservation rule**. Concr
    `getComputedStyle(document.documentElement)`; fall back to the prototype hex if a
    var is absent (so the bar still renders if it ever runs without the reskin).
 
-### Surfaced tradeoffs (rule #4 — not decided silently)
+### Animation & color — decided (Justin, 2026-06-03)
 
-- **Amber final-stretch cue + pulsing live dot** exist in the shipped bar but **not**
-  in the prototype. "Match the prototype" → **drop both** for fidelity. They are
-  genuine usability cues, so this is called out, not buried; default is to drop them.
-  (If desired later, a subtle amber `<5 min` tint is an additive enhancement that
-  doesn't conflict with the prototype's look.)
+The throughline: **the bar should recede, not perform.** A calm, glanceable, ambient
+indicator — the only thing that ever moves is the fill edge creeping right.
+
+- **Pulse + live dot — REMOVED.** Distracting. The shipped bar's pulsing dot (and its
+  faster pulse in the final stretch) are gone entirely.
+- **Sheen shimmer — REMOVED.** A deliberate, calm-direction departure from the
+  prototype (which has the sweep). No moving highlight; the fill is a flat coral
+  gradient that simply advances.
+- **Subtle final-stretch shift — KEPT, but static.** Under 5 minutes the cue shifts
+  toward amber as a gentle "time's almost up" signal — a **color change only, no
+  pulsing, no acceleration**. Applies to the `MM:SS left` readout and a subtle warm
+  tint on the fill; amber is a system-status signal (Nielsen #1), not error-red.
+  Amber accent: the shipped `#FFC107` (or softer), tuned subtle in implementation.
 - **Tabular numerals** kept for the `%` and time so the digits don't jitter as they
   tick — a readability nicety the prototype's static mockup doesn't exercise but that
   a live ticking readout needs.
