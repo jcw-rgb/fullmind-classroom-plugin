@@ -74,7 +74,7 @@ signal available from the SDK).
 npm run build-bundle   # → dist/FullmindClassroom.js + dist/manifest.json
 ```
 
-Manifest is at `0.0.4`. Upload both `dist/` files to the S3 folder per
+Manifest is at `0.0.5`. Upload both `dist/` files to the S3 folder per
 `DEV-HANDOFF.md`.
 
 ## Local preview
