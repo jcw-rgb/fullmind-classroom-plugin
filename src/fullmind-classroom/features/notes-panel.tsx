@@ -1,8 +1,4 @@
 import * as React from 'react';
-import * as ReactDOM from 'react-dom/client';
-import {
-  GenericContentSidekickArea,
-} from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
 
 /**
@@ -19,8 +15,6 @@ import { FM } from './theme';
 // CONFIRM IN LIVE ROOM — the Etherpad pad URL, e.g.
 //   https://bbb1-v3.fullmindlearning.com/pad/auth_session?padName=<id>$notes
 const NOTES_PAD_URL = '';
-
-const NOTES_ICON = 'copy';
 
 export function NotesPanelView(): React.ReactElement {
   if (NOTES_PAD_URL) {
@@ -49,20 +43,4 @@ export function NotesPanelView(): React.ReactElement {
       </div>
     </div>
   );
-}
-
-// pluginUuid kept for API symmetry with makeChatArea / makeSessionProgressBar
-// eslint-disable-next-line @typescript-eslint/no-unused-vars
-export function makeNotesArea(_pluginUuid: string): GenericContentSidekickArea {
-  return new GenericContentSidekickArea({
-    name: 'Notes',
-    section: 'Fullmind',
-    buttonIcon: NOTES_ICON,
-    open: false,
-    contentFunction: (element: HTMLElement): ReactDOM.Root => {
-      const root = ReactDOM.createRoot(element);
-      root.render(<NotesPanelView />);
-      return root;
-    },
-  });
 }

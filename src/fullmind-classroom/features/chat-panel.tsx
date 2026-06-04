@@ -2,23 +2,17 @@ import * as React from 'react';
 import {
   useEffect, useMemo, useRef, useState,
 } from 'react';
-import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
   PluginApi,
-  GenericContentSidekickArea,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
 
 /**
  * Chat panel — one of the three Fullmind sidebar panels (prototype rail: Chat).
- * Surfaces BBB's native public chat inside a branded Generic Content sidekick panel.
+ * Surfaces BBB's native public chat inside the Lesson Hub rail.
  * Default-to-BBB-behavior: public chat only; BBB lock settings still apply.
  */
-
-// BBB icon-set name (a string). 'chat' is the expected name; if the sidebar button
-// shows a fallback glyph in the live room, swap this for a confirmed icon name.
-const CHAT_ICON = 'chat';
 
 export function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
@@ -110,18 +104,4 @@ export function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.Rea
       </div>
     </div>
   );
-}
-
-export function makeChatArea(pluginUuid: string): GenericContentSidekickArea {
-  return new GenericContentSidekickArea({
-    name: 'Chat',
-    section: 'Fullmind',
-    buttonIcon: CHAT_ICON,
-    open: false,
-    contentFunction: (element: HTMLElement): ReactDOM.Root => {
-      const root = ReactDOM.createRoot(element);
-      root.render(<ChatPanelView pluginUuid={pluginUuid} />);
-      return root;
-    },
-  });
 }

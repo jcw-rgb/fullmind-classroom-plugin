@@ -1,10 +1,8 @@
 import * as React from 'react';
 import { useMemo } from 'react';
-import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
   PluginApi,
-  GenericContentSidekickArea,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
 
@@ -13,8 +11,6 @@ import { FM } from './theme';
  * Surfaces BBB's roster: who's here, their role, and live talking/muted state.
  * Default-to-BBB-behavior: same participants BBB shows.
  */
-
-const CLASS_ICON = 'user';
 
 export function ClassPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
@@ -72,18 +68,4 @@ export function ClassPanelView({ pluginUuid }: { pluginUuid: string }): React.Re
       })}
     </div>
   );
-}
-
-export function makeClassArea(pluginUuid: string): GenericContentSidekickArea {
-  return new GenericContentSidekickArea({
-    name: 'Class',
-    section: 'Fullmind',
-    buttonIcon: CLASS_ICON,
-    open: false,
-    contentFunction: (element: HTMLElement): ReactDOM.Root => {
-      const root = ReactDOM.createRoot(element);
-      root.render(<ClassPanelView pluginUuid={pluginUuid} />);
-      return root;
-    },
-  });
 }
