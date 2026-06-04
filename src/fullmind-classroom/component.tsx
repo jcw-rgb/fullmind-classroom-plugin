@@ -70,6 +70,14 @@ function FullmindClassroom(
     });
   };
 
+  // ── Greeting: a one-time "hello" toast on join ──────────────────────────────
+  // Fires the branded notification exactly once when the plugin mounts (i.e. when
+  // the participant joins the room). Empty deps → mount-only, so it never re-fires
+  // when the SDK pushes fresh user/meeting data on later renders.
+  useEffect(() => {
+    sendFullmindNotification('Hello Justin');
+  }, []);
+
   // ── CONNECTION 4: a UI surface + proof-of-life ──────────────────────────────
   // One Options-dropdown (⋮) item that exercises every connection above at once:
   // it reads the live user/meeting data and fires a branded toast. This is how

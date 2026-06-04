@@ -1,0 +1,94 @@
+import * as React from 'react';
+import { useEffect } from 'react';
+import {
+  BbbPluginSdk,
+  PluginApi,
+  ActionButtonDropdownOption,
+  NotificationTypeUiCommand,
+  pluginLogger,
+} from 'bigbluebutton-html-plugin-sdk';
+
+/**
+ * Exit Ticket — the prototype's "Start Exit Ticket" item in the ⊕ Actions menu.
+ *
+ * From the prototype legend (pin: PLUGIN): the Actions menu shows four BBB-native
+ * actions (Manage presentations / Start a poll / Timer / Share camera) and then a
+ * fifth, Fullmind-added item — "Start Exit Ticket". The four natives already live
+ * in BBB's own Actions dropdown, so this feature ADDS only the fifth item; the SDK
+ * appends it after the natives, matching the prototype's order.
+ *
+ * SCOPE (per Justin, 2026-06-03): ship the MENU ITEM now; WIRE the behaviour later
+ * (the exit-ticket flow isn't specced yet and the plugin isn't deployed to the room
+ * yet). So onClick is an honest placeholder — see the note in it for where the real
+ * modal launcher goes.
+ *
+ * Verified against SDK 0.0.73 type defs (not guessed):
+ *   • pluginApi.setActionButtonDropdownItems([...]) — registers ⊕-menu items.
+ *   • new ActionButtonDropdownOption({ id?, label, icon, tooltip, allowed, onClick }).
+ *   • `allowed` is the visibility gate — false hides the item (used for role-gating).
+ */
+
+const LOG = '[Fullmind]';
+
+// Exit-ticket glyph. The SDK's dropdown `icon` is a bbb-icons FONT GLYPH NAME
+// (BBB renders it as <i class="icon-bbb-<name>">), NOT an SVG — so the prototype's
+// custom clipboard-with-check SVG can't be passed through verbatim (the reskin
+// feasibility note: custom icon shapes need a rebuilt font or a custom SVG button,
+// neither of which a dropdown item supports). 'check' is the closest stock glyph to
+// the prototype's checkmark.
+// ⚠️ CONFIRM/SWAP against the live bbb-icons set on first room test. Known-valid
+// glyph names seen live 6/3: user, logout, more, left_arrow, device_list_selector.
+// The label always renders, so a missing glyph only blanks the icon — never hides
+// the item. This is the ONE place to change the icon.
+const EXIT_TICKET_ICON = 'check';
+
+function ExitTicket({ pluginUuid }: { pluginUuid: string }): null {
+  // Idempotent — just (re)binds the api handle on window.bbb_plugins[uuid].
+  BbbPluginSdk.initialize(pluginUuid);
+  const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
+
+  // Exit tickets are teacher-initiated, so the item is moderator-only. Hooks run
+  // unconditionally at the top (rules of hooks); role gating happens via `allowed`.
+  const currentUser = pluginApi.useCurrentUser()?.data;
+  const isModerator = currentUser?.role === 'MODERATOR';
+
+  useEffect(() => {
+    // setActionButtonDropdownItems REPLACES this plugin's ⊕-menu item list (it does
+    // NOT touch BBB's native items — those render alongside ours). It's a different
+    // setter than the foundation's setOptionsDropdownItems (the ⋮ menu) and the
+    // progress bar's setFloatingWindows, so the three features never clobber each
+    // other. Register ONCE; only re-run when the gating value (moderator) actually
+    // flips — the SDK hands back fresh object refs on every data push, so depending
+    // on the derived boolean (not the user object) keeps this from thrashing.
+    pluginApi.setActionButtonDropdownItems([
+      new ActionButtonDropdownOption({
+        id: 'fullmind-start-exit-ticket',
+        label: 'Start Exit Ticket',
+        icon: EXIT_TICKET_ICON,
+        tooltip: 'Start the end-of-class exit ticket',
+        // allowed:false hides it for viewers, so we can register unconditionally
+        // and let the flag do the role gate (no conditional registration needed).
+        allowed: isModerator,
+        onClick: () => {
+          // ── PLACEHOLDER — wiring deferred (Justin, 2026-06-03) ──────────────
+          // The real behaviour: open the exit-ticket modal here. Build it as a
+          // FloatingWindow styled to look modal — the SDK has no true blocking
+          // modal, and SessionProgressBar (./session-progress-bar) is the working
+          // template for a FloatingWindow with its own React root. Replace this
+          // toast with that launcher once the exit-ticket flow is specced.
+          pluginLogger.info(`${LOG} Start Exit Ticket clicked — modal wiring TODO.`);
+          pluginApi.uiCommands.notification.send({
+            type: NotificationTypeUiCommand.INFO,
+            icon: EXIT_TICKET_ICON,
+            message: 'Exit Ticket — coming soon.',
+          });
+        },
+      }),
+    ]);
+  }, [isModerator]);
+
+  // Registrar only — renders no DOM of its own (the item lives in BBB's menu).
+  return null;
+}
+
+export default ExitTicket;
