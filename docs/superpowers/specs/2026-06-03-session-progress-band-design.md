@@ -6,6 +6,30 @@
 > `fullmind-bbb-base.css` §"FULL-WIDTH plum chrome bars" + §F, and the open
 > "form-factor delta" already logged in `README.md` and `FEATURE-session-progress-bar.md`.
 
+## ⛔ BLOCKED — resume when the Lesson Hub rail lands (Justin, 2026-06-03)
+
+Do **not** start coding this yet. The Lesson Hub rail
+(`2026-06-03-fullmind-lesson-hub-rail-design.md`) is being actively built on this same
+branch and is **mid-migration**: it converts the progress bar from self-registering to a
+shared **floating-windows hub** (`setFloatingWindows` is last-writer-wins, so one hub must
+own it). The band touches the **same files** that refactor edits
+(`session-progress-bar.tsx`, `component-working.tsx`, `manifest.json`) — building now would
+collide.
+
+**Resume trigger:** the rail is fully committed and integrated — specifically when
+`register-floating-windows.tsx` (or equivalent hub) exists and calls
+`setFloatingWindows([progressBar, rail])`, the progress bar exports its descriptor and no
+longer self-registers, and `component-working.tsx` renders the hub.
+
+**On resume, re-sync before planning (the start-of-session snapshot is stale):**
+1. The band is the progress bar **descriptor** restyled — change the VIEW only; register it
+   through the hub, never via its own `setFloatingWindows` call.
+2. **Coordinate vertical geometry with the rail:** the band reserves a 32px strip *above*
+   the navbar, so the rail's "top offset" must become `band + nav`, not `nav` — else the
+   band overlaps the rail. Update the rail's live-wire offset accordingly.
+3. **manifest version is already past 0.0.3** — bump from whatever the rail leaves it at
+   (the "0.0.2 → 0.0.3" note below is stale).
+
 ## Goal
 
 Turn the shipped Session Progress bar from a **centered floating pill** into the
