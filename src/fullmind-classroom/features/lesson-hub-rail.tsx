@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
@@ -65,17 +65,21 @@ const ICONS: Record<Tab, React.ReactElement> = {
 // CONFIRM the format in the test room if the badge count looks wrong.
 function parseTime(v: string): number {
   const n = Number(v);
-  if (Number.isFinite(n) && n > 1e11) return n; // epoch ms as string
-  return Date.parse(v);
+  if (Number.isFinite(n) && n > 1e11) return n; // epoch ms (~13 digits)
+  if (Number.isFinite(n) && n > 1e8) return n * 1000; // epoch seconds (~10 digits)
+  return Date.parse(v); // ISO 8601
 }
 
-function railStyle(): string {
-  return `
-    ${NATIVE_SIDEBAR_SELECTOR} { display: none !important; }
-    ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH}px !important; transition: margin-left .18s ease; }
-    body.fm-hub-open ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH + PANEL_WIDTH}px !important; }
-  `;
-}
+// NOTE: margin-left works when the stage container is in normal flow. If BBB's stage
+// container is absolutely-positioned, margin-left shifts it right without shrinking its
+// width (the right edge overflows). In that case — if the stage shifts but doesn't
+// reflow narrower in the test room — switch the rule to width / left / right instead of
+// margin-left.
+const RAIL_STYLE = `
+  ${NATIVE_SIDEBAR_SELECTOR} { display: none !important; }
+  ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH}px !important; transition: margin-left .18s ease; }
+  body.fm-hub-open ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH + PANEL_WIDTH}px !important; }
+`;
 
 function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
@@ -87,10 +91,9 @@ function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactEleme
   const chatResponse = pluginApi.useLoadedChatMessages();
   const messages = chatResponse?.data ?? [];
 
-  const unread = useMemo(() => {
-    if (active === 'chat') return 0;
-    return messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
-  }, [messages, lastChatOpenedAt, active]);
+  // messages is a fresh array reference every render (SDK wrapper), so useMemo would
+  // recompute every render anyway. Filter is cheap — plain const is clearer.
+  const unread = active === 'chat' ? 0 : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
 
   // Toggle the body class that drives the stage push.
   useEffect(() => {
@@ -123,7 +126,7 @@ function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactEleme
         fontFamily: FM.font,
       }}
     >
-      <style>{railStyle()}</style>
+      <style>{RAIL_STYLE}</style>
 
       {/* rail (prototype .iconrail) */}
       <div
