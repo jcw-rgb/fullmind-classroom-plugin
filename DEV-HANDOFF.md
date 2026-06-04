@@ -29,7 +29,7 @@ bundle:    https://public-global-files.s3.us-west-1.amazonaws.com/fullmind-class
 
 > The manifest's `javascriptEntrypointUrl` is **relative** (`"FullmindClassroom.js"`), so BBB
 > resolves the bundle from the **same folder** as the manifest. Keep both files together; that's the only constraint.
-> `manifest.json` already carries `"version": "0.0.1"` — BBB appends `?version=0.0.1` to bust browser cache.
+> `manifest.json` already carries `"version": "0.0.4"` — BBB appends `?version=0.0.4` to bust browser cache.
 > **When the bundle changes, bump that version** (in `manifest.json`) and re-upload both, or clients keep the cached JS.
 
 ---
@@ -89,6 +89,13 @@ won't create. Add it before signing — then the existing signing code covers it
 3. Open the **⋮ (Options)** menu → click **"Fullmind — test connection"**.
 4. Expect: `[Fullmind]` log lines (user + meeting data) **and** a branded toast
    `Hi <name> — connected to <room>…`. That confirms the whole pipeline (load → run → read room data → render UI).
+5. The bundle also renders the **Lesson Hub rail** — a vertical bar of three icon
+   buttons (Chat / Notes / Class) docked to the left edge below the top nav. Click
+   one to slide out its panel. Chat/Notes/Class start empty and fill from the live
+   room. Four `// CONFIRM IN LIVE ROOM` constants in the source (`NOTES_PAD_URL` +
+   three BBB-layout selectors + the rail top offset) need tuning once in the test
+   room so the rail sits below the nav, the panel "push" shrinks the whiteboard, and
+   BBB's native sidebar is hidden — see `src/fullmind-classroom/features/README.md`.
 
 ---
 
