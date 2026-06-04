@@ -34,10 +34,19 @@ function FontSizeReorder(): null {
       }
     };
 
-    apply();
-    const observer = new MutationObserver(apply);
+    let rafId: number | null = null;
+    const schedule = () => {
+      if (rafId !== null) return;
+      rafId = requestAnimationFrame(() => { rafId = null; apply(); });
+    };
+
+    apply(); // initial attempt (in case the settings DOM is already present)
+    const observer = new MutationObserver(schedule);
     observer.observe(document.body, { childList: true, subtree: true });
-    return () => observer.disconnect();
+    return () => {
+      if (rafId !== null) cancelAnimationFrame(rafId);
+      observer.disconnect();
+    };
   }, []);
 
   return null;
