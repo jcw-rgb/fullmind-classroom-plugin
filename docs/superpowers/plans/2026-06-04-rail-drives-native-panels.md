@@ -23,7 +23,7 @@ Replace the entire file with:
 
 ```tsx
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
@@ -130,7 +130,9 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
   // Unread badge: messages since Chat was last opened.
   const chatResponse = pluginApi.useLoadedChatMessages();
   const messages = chatResponse?.data ?? [];
-  const unread = chatOpen ? 0 : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
+  const unread = chatOpen
+    ? 0
+    : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
 
   const isActive = (tab: Tab): boolean => {
     if (tab === 'chat') return chatOpen;
