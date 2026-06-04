@@ -1,0 +1,941 @@
+/* ============================================================================
+   fullmind-bbb-combined.css  —  Fullmind re-skin for BigBlueButton 3.0 (FULL)
+   ----------------------------------------------------------------------------
+   ⭐ BASE STYLESHEET — this is the canonical Fullmind BBB reskin. It supersedes
+   the separate colour + enhance files; ship/test from THIS file only.
+
+   The complete CSS reskin in ONE file = COLOR (v1) + TYPOGRAPHY + SHAPE/SPACING.
+   Merged 2026-06-01 from:
+     • fullmind-bbb.css           (colour pass — proven live)
+     • fullmind-bbb-enhance.css   (font + shape/spacing — DOM-verified live)
+
+   ── CHANGELOG ────────────────────────────────────────────────────────────────
+   2026-06-03  Bottom-bar SIMPLIFIED to one on/off pattern (§E fully rewritten). Per Justin:
+               coral = on, white = off, no outer ring. DOM dump showed every bar button is
+               `button.buttonWrapper.lg` and BBB flips color="default"↔"primary" for off/on,
+               so the whole bar is TWO rules keyed on .buttonWrapper.lg[color]: OFF = white
+               circle + dark glyph, ON = solid coral circle + white glyph. This auto-tracks
+               the data-test SWAP (joinVideo→leaveVideo etc.) and drops the lingering :focus
+               ring entirely. Replaced the per-button §E + §E1(CC) + §E2(ring) blocks (~9 rule
+               sets → 6). Reactions is an inline SVG, so we set both color and fill.
+               Post-review cleanup (Opus clean-code pass): live check proved the "+"
+               actionsButton is a .buttonWrapper.lg[color="primary"] bar button, so §E
+               already paints it coral AND out-specifies §B2 — §B2's actionsButton coral
+               entries were dead/overridden code, now removed (kept only its ::before/
+               ::after reset). Zero visual change.
+   2026-06-03  Stage corners SQUARED (presentationContainer border-radius 14px → 0).
+               The rounding created small dark gaps at the corners where the stage
+               meets the chat/notes panel (rounded edge pulled away from the square
+               panel). SUPERSEDES the "restored full 14px rounding" from today's
+               Stage→LIGHT entry. Also rounded chat Send button: added overflow:hidden
+               (radius alone left the inner coral span's corners sharp) + 8px margin
+               to gap it off the input.
+   2026-06-03  Opus review cleanup. Sections relabeled sequential A–F (merge had left
+               two §E's); navbar internals renumbered E0–E5 → F0–F5. Fixed: modal scrim
+               plum → #3E3A6E (was stale #403770, pre-rebrand); phantom var(--fm-ink)
+               → var(--fm-offwhite) (token was used-but-never-defined); deleted orphaned
+               --fm-robins-egg; refreshed stale §C "dead selectors" note. KEPT on purpose:
+               --color-primary-lighter/darker (override BBB's ramp tokens, may feed BBB
+               surfaces) + dialog shadow #272244 (deliberate dark shadow). The B4
+               settings-toggle selector is broad/global — flagged for a scoping decision.
+   2026-06-03  Chat composer fix. Killed the box-in-a-box on the input: BBB's WRAPPER
+               (.sc-lopPiv, via :has(> #message-input)) is now the single box (white,
+               Gray-300 border, 10px radius, CORAL focus via :focus-within — was BBB
+               blue on hover/focus); textarea made transparent/borderless. Restored the
+               divider above the composer (border-top on form:has(#message-input)).
+   2026-06-03  Chat panel. New §D: composer input (#message-input) → white, Gray-300
+               border, 10px radius, coral focus; Send → 10px rounded square; user
+               message bubbles (data-test="messageContent") → gray #F4F7F9 10px bubble;
+               chat avatars → rounded square (per-user flat color kept; CSS can't do
+               the prototype gradient). STILL PENDING (no stable hook): sender-name
+               steel color + the "You = coral" own-message treatment — see §D TODO.
+               Sidebar rail / badges / icon-rail logged to the plugin README backlog
+               (structural, not CSS).
+   2026-06-03  Close button (modalDismissButton) hover box rounded to 8px — BBB's
+               secondary-button hover painted a square gray rectangle.
+   2026-06-03  Unified primary-coral button hover. All coral buttons (actionsButton,
+               minimizePresentation, sendMessageButton, modalConfirmButton,
+               confirmButton) now read FLAT coral in every state — like actionsButton
+               always did. Collapsed three separate blocks (action / Send / Save) into
+               ONE :is() rule and deleted the per-button coral-hover/coral-active
+               darken ramps. SUPERSEDES today's earlier "Save :hover → coral-hover"
+               change — Save no longer darkens on hover; it matches action (flat, no
+               glow). Save/confirm 11px radius retained. Leave button (danger red)
+               intentionally NOT unified.
+   2026-06-03  Settings modal polish. (1) Save button (modalConfirmButton): radius
+               → 11px, and hover/active forced to coral-hover/coral-active with
+               !important (BBB's hardcoded blue :hover was out-specificity-ing the
+               existing bare [data-test]:hover rule). (2) Settings tabs (#fsmodal
+               [role="tab"]) rounded to 11px so the selected coral tab matches the
+               prototype's .set-navitem. Both match prototype radii.
+   2026-06-03  Font-size stepper → GRAY. Settings → Application font +/- buttons
+               recolored from coral to Gray 300 (#DEE2E6, dark glyph), matching the
+               6/2 prototype's secondary-control treatment; reuses the actionsButton
+               color="primary" pin pattern. Stable [data-test] hooks. NOTE: the
+               prototype also puts the "90%" value BETWEEN the buttons — NOT done
+               here: the value and buttons sit in separate sibling cells, so a clean
+               reorder isn't possible in CSS (only via a fragile display:contents
+               hack on BBB's regenerated hashed classes). That reorder is PLUGIN work.
+   2026-06-03  Stage → LIGHT. Behind-the-whiteboard surface (presentationContainer +
+               cameraDock) flipped from deep plum #272244 to light #EDF2F5 via new
+               --fm-stage token (prototype "letterbox" direction: bright core, plum
+               only on top/bottom bars). Removed the C1b deep-plum stage-edge divider
+               (it blended the old plum letterbox; pointless on a light stage) and
+               restored full 14px rounding. Dropped the now-orphaned --fm-plum-deep
+               token. ⚠️ Re-verify live: slides/webcam on light, and watch for the
+               panel-resize separator bug C1b used to fix (see §C1b note).
+   2026-06-03  Ported 3 design decisions from Prototype_01_2026-06-02_bbb-toolbar.html:
+               (1) chrome-bar plum → #3E3A6E (Justin's brand swatch; was #403770);
+               (2) recording chip → toned-down red #9E3A42 via new --fm-rec (leave/
+               end-call keeps loud --fm-danger); (3) bottom-bar media buttons → WHITE
+               filled circles with dark glyphs (consolidated B2+D into one block;
+               removed the now-orphaned --fm-plum-tint token). ⚠️ ITEM (3) SUPERSEDED
+               by the 6/3 on/off rewrite at the top of this log — the bar is no longer a
+               static white circle; it's white-when-OFF / coral-when-ON via §E. The
+               --fm-plum-tint removal still stands. (Items 1 & 2 still current.)
+   2026-06-01  Blessed as BASE. Added the C1b stage-edge divider: a 6px deep-plum
+               border on the left of presentationContainer, with the stage's left
+               corners squared (border-radius 0 14px 14px 0) so it runs straight.
+               Fixes the panel/stage separator vanishing on resize — the old cue
+               was the whiteboard's own frame border, which rode the rescaling
+               slide out of view. Verified live by resizing the chat/notes panel.
+
+   ── HOW TO USE ──────────────────────────────────────────────────────────────
+   PRODUCTION (the real target): host this file and point
+     userdata-bbb_custom_style_url  (vidapi join_class) — OR the global
+     clientSettingsOverride customStyleUrl — at it. It loads AFTER BBB's own
+     CSS, so the cascade wins. This is PLAIN CSS on purpose (no @-moz-document):
+     the room that loads it already scopes it to the BBB domain.
+
+   LOCAL TEST (Stylus): paste this whole file into ONE Stylus style, and scope it
+     via Stylus's UI → "Applies to" → "URLs on the domain" → bbb1-v3.fullmindlearning.com
+     (the same way the colour style is scoped — do NOT add an @-moz-document
+     wrapper, and you no longer need two separate Stylus styles).
+
+   ── FONT NOTE ────────────────────────────────────────────────────────────────
+   The font loads via @font-face (NOT @import). A userstyle manager injects its
+   CSS into an already-built page, and the browser refuses a late-added @import,
+   so the font silently never downloads. @font-face is an ordinary rule that
+   injects reliably AND works identically in production. (bbb1-v3 sends no CSP,
+   so the font host is not blocked.) URLs pulled live from Google Fonts
+   2026-06-01 — Plus Jakarta Sans v12, one variable file covering weights 400–700.
+
+   Confidence tiers used below:
+     ✅ PROVEN / CONFIRMED  — verified live (colour §10 + the 6/1 DOM audit)
+     ⚠️ VISUAL-CHECK        — one rule whose only risk is a visible clip; screenshot it
+   ============================================================================ */
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   A. TYPOGRAPHY  —  Plus Jakarta Sans (the ONLY Fullmind typeface)
+   ████████████████████████████████████████████████████████████████████████████ */
+
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko20yygg_vb.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+@font-face {
+  font-family: 'Plus Jakarta Sans';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: url('https://fonts.gstatic.com/s/plusjakartasans/v12/LDIoaomQNQcsA88c7O9yZ4KMCoOg4Ko40yygg_vbd-E.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1D00-1DBF, U+1E00-1E9F, U+1EF2-1EFF, U+2020, U+20A0-20AB, U+20AD-20C0, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
+
+/* Broad font-family override. BBB sets font-family via styled-components on many
+   elements, so a system-wide override with !important is the one legitimate use
+   of it here (a deliberate global change, not a specificity workaround). Icon-font
+   elements are left ALONE so glyphs keep rendering — never restyle their font. */
+body, button, input, select, textarea, a, p, span, div, h1, h2, h3, h4, h5, h6,
+li, label, th, td {
+  font-family: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif !important;
+}
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   B. COLOUR  —  from fullmind-bbb.css (proven live)
+   ████████████████████████████████████████████████████████████████████████████ */
+
+/* ----------------------------------------------------------------------------
+   B0. Fullmind palette (source of truth: design system)
+   ---------------------------------------------------------------------------- */
+:root {
+  /* Brand */
+  --fm-plum:            #3E3A6E; /* dark authority — chrome bars (Justin's brand-plum swatch, ported from prototype 6/2; was #403770). The overlay only uses plum for the chrome bars, so this single token IS the prototype's --fm-plum-swatch — no separate token needed here. */
+  --fm-stage:           #EDF2F5; /* light working-stage surface behind the whiteboard (ported from prototype 6/2 "letterbox" direction: bright core, deep-plum only on top/bottom bars). Replaced --fm-plum-deep #272244, which the stage no longer uses. */
+  --fm-coral:           #F37167; /* primary action                     */
+  --fm-coral-hover:     #F04E42; /* Coral 60                           */
+  --fm-coral-active:    #EC2213; /* Coral 50                           */
+  --fm-steel:           #6EA3BE; /* whiteboard frame / accent          */
+  --fm-offwhite:        #FFFCFA; /* surfaces (navbar title) — was orphaned, now used in §F */
+
+  /* Semantic state */
+  --fm-success:         #198754; /* success toast (Bootstrap green) / toggle ON */
+  --fm-danger:          #E0182D; /* destructive (leave / end-call)      */
+  --fm-rec:             #9E3A42; /* recording chip — toned-down red (ported from prototype 6/2; was --fm-danger) */
+  --fm-neutral-off:     #ADB5BD; /* Gray 500 — toggle OFF / disabled neutral */
+
+  /* Text */
+  --fm-text:            #212529; /* Gray 900 */
+  --fm-link:            #F04E42; /* Coral 60 */
+}
+
+/* ----------------------------------------------------------------------------
+   B1. ✅ PROVEN — CSS custom properties that drive primary buttons + accents
+   ---------------------------------------------------------------------------- */
+:root {
+  --color-primary:            var(--fm-coral);        /* BBB blue #2f80ed → Coral */
+  --color-primary-button:     var(--fm-coral);
+  --color-primary-lighter:    var(--fm-coral-hover);
+  --color-primary-darker:     var(--fm-coral-active);
+
+  /* tldraw whiteboard selection — mapped the whiteboard frame to Steel Blue */
+  --color-selected:           var(--fm-steel);        /* was #4285f4 */
+  --color-selection-stroke:   var(--fm-steel);        /* was #2f80ed */
+
+  /* Toast notifications stay on-brand */
+  --toastify-color-progress-light: var(--fm-coral);
+  --toastify-color-info:           var(--fm-steel);
+  --toastify-color-success:        var(--fm-success);
+  --toastify-color-error:          var(--fm-danger);
+}
+
+/* ----------------------------------------------------------------------------
+   B2. ✅ PROVEN — per-button recolor via [data-test]
+       AD Finding 2: coral = the ONE primary action per view. Destructive = red.
+       Idle media controls = neutral.
+   ---------------------------------------------------------------------------- */
+
+/* ── UNIFIED PRIMARY-CORAL BUTTONS (2026-06-03) ───────────────────────────────
+   Every primary coral button reads FLAT coral in ALL states — default / hover /
+   focus / active alike. No hover darken, no blue, no glow. ONE rule for them: the
+   round minimizePresentation chevron AND the text/primary buttons (chat Send, modal
+   Save/confirm). NOTE: the bottom-bar "+" actionsButton USED to live in this list,
+   but it's a .buttonWrapper.lg bar button so §E now owns its colour (coral via
+   [color="primary"], higher specificity — §B2's entry here was dead/overridden code,
+   removed). It keeps only its ::before/::after reset below. Supersedes the earlier
+   per-button darken ramps
+   (sendMessage/Save → coral-hover/active), now deleted.
+   BBB bakes its hover blue into high-specificity styled classes AND onto the inner
+   <span color="primary">, so we pin the button + that inner span across every state
+   with !important (!important beats BBB regardless of specificity; the explicit
+   :hover/:focus/:active are belt-and-suspenders in case BBB marks a state important).
+   SHAPE (radius) stays per-button elsewhere — only COLOR is unified here. The label
+   span has no color attr, so > span[color="primary"] hits only the icon circle.
+   :is() keeps the 4-button list readable; each [data-test] keeps the specificity. */
+:is(
+  [data-test="minimizePresentation"],
+  [data-test="sendMessageButton"],
+  [data-test="modalConfirmButton"],
+  [data-test="confirmButton"]
+),
+:is(
+  [data-test="minimizePresentation"],
+  [data-test="sendMessageButton"],
+  [data-test="modalConfirmButton"],
+  [data-test="confirmButton"]
+):is(:hover, :focus, :active),
+:is(
+  [data-test="minimizePresentation"],
+  [data-test="sendMessageButton"],
+  [data-test="modalConfirmButton"],
+  [data-test="confirmButton"]
+) > span[color="primary"],
+:is(
+  [data-test="minimizePresentation"],
+  [data-test="sendMessageButton"],
+  [data-test="modalConfirmButton"],
+  [data-test="confirmButton"]
+):is(:hover, :focus, :active) > span[color="primary"] {
+  background-color: var(--fm-coral) !important;
+  color: #fff !important;
+  box-shadow: none !important;
+}
+[data-test="minimizePresentation"] {
+  border-radius: 50%;
+  overflow: hidden;
+}
+[data-test="actionsButton"]::before,
+[data-test="actionsButton"]::after,
+[data-test="minimizePresentation"]::before,
+[data-test="minimizePresentation"]::after { background-color: transparent !important; box-shadow: none !important; }
+
+/* AD Finding 2 — leave/end-call is DESTRUCTIVE → Danger red, not coral */
+[data-test="leaveMeetingDropdown"],
+[data-test="leaveMeetingDropdown"] > button {
+  background-color: var(--fm-danger);
+  color: #fff;
+}
+
+/* AD Finding 5 — recording indicator still reads RED (it means "you're live"),
+   but uses the TONED-DOWN --fm-rec (#9E3A42), ported from the 6/2 prototype, so
+   the chip is calmer than full danger-red while leave/end-call keeps the loud
+   --fm-danger. Round the chip: the fill exposed the container's sharp corners,
+   so clip it. */
+[data-test="recordingIndicator"] {
+  background-color: var(--fm-rec);
+  color: #fff;
+  border-radius: 999px;   /* full pill — matches prototype's recordingIndicator (was 14px rounded-rect) */
+  overflow: hidden;
+}
+
+/* Font-size stepper (Settings → Application) → NEUTRAL gray, NOT coral.
+   DOM-verified 6/3: each button carries color="primary" on the <button> AND an
+   inner <span color="primary"> that paints the circle (same shape as actionsButton
+   above), so the global --color-primary coral bleeds in. The 6/2 prototype makes
+   these gray SECONDARY controls — coral stays reserved for the ONE primary action
+   (Save). Stable hooks: [data-test="decreaseFontSize" | "increaseFontSize"]. */
+[data-test="decreaseFontSize"],
+[data-test="decreaseFontSize"]:hover,
+[data-test="decreaseFontSize"]:focus,
+[data-test="decreaseFontSize"]:active,
+[data-test="increaseFontSize"],
+[data-test="increaseFontSize"]:hover,
+[data-test="increaseFontSize"]:focus,
+[data-test="increaseFontSize"]:active,
+[data-test="decreaseFontSize"] > span[color="primary"],
+[data-test="increaseFontSize"] > span[color="primary"] {
+  background-color: #DEE2E6 !important;   /* Gray 300 — matches prototype .step circle */
+  color: #495057 !important;              /* Gray 700 — dark glyph */
+  box-shadow: none !important;
+}
+/* hover → one shade darker, like the prototype's .step:hover */
+[data-test="decreaseFontSize"]:hover,
+[data-test="increaseFontSize"]:hover,
+[data-test="decreaseFontSize"]:hover > span[color="primary"],
+[data-test="increaseFontSize"]:hover > span[color="primary"] {
+  background-color: #CED4DA !important;   /* Gray 400 */
+}
+/* the icon-font glyph itself (<i class="icon-bbb-substract|add">) → dark gray */
+[data-test="decreaseFontSize"] i,
+[data-test="increaseFontSize"] i {
+  color: #495057 !important;
+}
+/* Round + clip the BUTTON itself. BBB leaves the <button> square — the coral
+   circle was the inner <span>, so filling the button bg above exposed its square
+   corners. Same shape fix as actionsButton in B2. */
+[data-test="decreaseFontSize"],
+[data-test="increaseFontSize"] {
+  border-radius: 50%;
+  overflow: hidden;
+}
+
+/* ALL bottom-bar buttons (joinAudio/Video, screenShare, raiseHand, reactions, CC,
+   mic, and the "+" actions/options button) → governed in ONE place in section E
+   below: WHITE circle when OFF (color="default"), CORAL circle when ON
+   (color="primary"). The "+" actions button reports color="primary", so §E keeps it
+   coral. §B2 above still owns the NON-bar primary buttons (minimizePresentation,
+   chat Send, modal Save/confirm). */
+
+/* ----------------------------------------------------------------------------
+   B3. The dark "chrome" bars + stage surfaces
+   ---------------------------------------------------------------------------- */
+
+/* ── FULL-WIDTH plum chrome bars + sidebar reflow ─────────────────────────────
+   Live-mapped 6/3 (Justin's test room). BBB's layout engine is a 2-COLUMN grid:
+   a left SIDEBAR column [0 → 582px, full height] and a right STAGE column that
+   stacks the navbar (top) / presentation (middle) / actions bar (bottom). So by
+   default BOTH plum bars start at left:582 — they span only the right column,
+   not the screen. The prototype wants them edge-to-edge with the sidebar tucked
+   between them.
+
+   Every region is positioned by the engine with INLINE
+   `position:absolute; left; width; top; height` (NO !important) and recomputed on
+   resize — so our !important overrides win the cascade and keep winning after
+   each recompute. Bar heights are stable; exposed as vars so the sidebar reflow
+   math has ONE place to tune if a BBB upgrade changes them. */
+:root {
+  --fm-navbar-h:     85px;  /* #Navbar height     (live 6/3) */
+  --fm-actionsbar-h: 64px;  /* #ActionsBar height — measured 64.4px live 6/3 (was 70px, which left a ~5.6px dark gap above the bar). Slight under-value so panels overlap the bar's top rather than gap. ⚠️ BBB scales bar height with window size, so a big resize can reopen a hairline gap — plugin territory long-term. */
+}
+
+/* Top navigation bar (navy → Plum) — ✅ CONFIRMED live 6/1: <header id="Navbar">.
+   Stretched edge-to-edge 6/3 (was left:582, right column only). */
+#Navbar {
+  background-color: var(--fm-plum);
+  left: 0 !important;
+  width: 100% !important;
+}
+
+/* Bottom action bar (navy → Plum). Stretched edge-to-edge 6/3.
+   Real element is <section id="ActionsBar" aria-label="Actions bar"> (live 6/3);
+   the old [data-test="actionsBar"] hook does NOT exist in this build. */
+#ActionsBar,
+section[aria-label="Actions bar"] {
+  background-color: var(--fm-plum);
+  left: 0 !important;
+  width: 100% !important;
+}
+
+/* Sidebar reflow — sit BETWEEN the now-full-width bars instead of behind them.
+   The sidebar is TWO anonymous positioned <div> wrappers (no id/class/data-test):
+   the icon rail [left 0] and the chat/notes/users panel [left ~240], both full
+   height. We grab them by STRUCTURE — direct <div> children of #layout that are
+   NOT one of the named regions:
+     • #Navbar is a <header> and #ActionsBar a <section> — excluded (not <div>).
+     • presentationContainer & emojiRain ARE <div> but carry data-test — excluded
+       by :not([data-test]).
+   ✅ Confirmed live 6/3: matches exactly the rail + panel (+ one harmless 0×0 div).
+   NOTE: an earlier attempt keyed on `#userListContainer` FAILED — that id only
+   exists while the Users tab is open, so it vanished in Chat view. Structural
+   targeting is tab-state independent, which is why it's the robust choice.
+   Both wrappers get the same move: down by the navbar height, shortened by both
+   bar heights, so they land exactly in the middle band.
+   ⚠️ Structural (the wrappers are unnamed) — re-verify after any BBB html5-client
+   upgrade. If the chat composer/input gets clipped, the height calc is the knob. */
+#layout > div:not([data-test]) {
+  top: var(--fm-navbar-h) !important;
+  height: calc(100% - var(--fm-navbar-h) - var(--fm-actionsbar-h)) !important;
+}
+
+/* Session-time-remaining banner → TRANSPARENT — ✅ CONFIRMED live 6/1. */
+[data-test="notificationBannerBar"] {
+  background-color: transparent !important;
+}
+[data-test="timeRemaining"] {
+  background-color: transparent;
+  color: #fff;
+}
+
+/* Presentation stage behind the whiteboard → LIGHT #EDF2F5 (ported from the 6/2
+   prototype's "letterbox" direction: bright working core, deep plum kept only on
+   the top/bottom bars). Was deep plum #272244 (confirmed live 6/1, now superseded).
+   ⚠️ Re-verify live: confirm slides/letterbox read well on the light stage. */
+[data-test="presentationContainer"] {
+  background-color: var(--fm-stage);
+}
+
+/* Camera dock (webcam panel) → same light stage surface (part of the bright core).
+   <div id="cameraDock"> carries an INLINE style="background: none", so !important
+   is required here. ⚠️ Re-verify live: check webcam tiles read OK on the light bg
+   (the prototype had no webcam dock, so this surface is undefined there). */
+#cameraDock {
+  background-color: var(--fm-stage) !important;
+}
+
+/* Whiteboard = a WHITE FLUSH CARD on the light stage (prototype 6/2 direction, minus
+   the inset). COLOUR half: white fill + 1px Gray-300 (#DEE2E6) border. Was a Steel-Blue
+   frame; switched to Gray-300 to match the prototype's neutral card.
+   NOTE 6/3: the prototype also floats this card with a 22px mat. That INSET is NOT
+   here — it crops (BBB sizes the whole presentation to presentationContainer's
+   JS-measured geometry; shrinking clips the slide-nav/logo/editor-frame). So this is
+   the FLUSH version: card fills the stage edge-to-edge, only the corners rounded
+   (radius + overflow in §C1). The true floating card is plugin work (see README). */
+[data-test="whiteboard"],
+[data-test="mainWhiteboard"] {
+  background-color: #fff !important;
+  border: 1px solid #DEE2E6 !important;   /* Gray 300 — prototype card border */
+}
+
+/* B3a. WHITEBOARD TOOLBAR (tldraw annotation bar) → Fullmind chrome + coral active tool.
+   tldraw renders its OWN UI with STABLE `tlui-*` library classes (NOT BBB's hashed
+   sc-*), so we target them directly. Verified live 6/3 (DevTools $0 on the toolbar):
+     • tool button : button.tlui-button.tlui-button__tool  (data-tool="select" etc.)
+     • ACTIVE tool : data-state="selected"   ← the hook (NOT aria-pressed)
+     • icon        : <div class="tlui-icon"> drawn as a CSS MASK of an SVG, so its
+                     colour follows the button's `color`/currentColor (recolour only,
+                     can't reshape — same family as the bbb-icons limit)
+     • tools strip : .tlui-toolbar__tools   ← the card to give Fullmind chrome
+   Prototype (.annotbar/.tool.sel): white rounded card; SELECTED tool fills coral with
+   a white glyph; non-selected hover = light gray. This overrides any steel tint the
+   §B1 --color-selected var puts on the active tool (we want coral here, not steel). */
+
+/* The toolbar card — white, Gray-300 border, 14px radius, soft shadow (prototype .annotbar). */
+.tlui-toolbar__tools {
+  background-color: #fff !important;
+  border: 1px solid #DEE2E6 !important;                 /* Gray 300 */
+  border-radius: 14px !important;
+  box-shadow: 0 6px 20px rgba(20, 17, 34, 0.12) !important;
+}
+
+/* Each tool button → rounded (prototype .tool = border-radius:9px). tldraw ships the
+   tool buttons square (radius 0), so without this the coral selected fill renders as a
+   SHARP square; this rounds it (and the gray hover) into the prototype's soft squares. */
+.tlui-button__tool {
+  border-radius: 9px !important;
+}
+
+/* Selected tool → coral fill + white glyph. CRUCIAL: tldraw draws the selected
+   highlight as a ROUNDED ::after pseudo-element (verified live 6/3: its background was
+   blue rgb(47,128,237)), NOT the button background. So colour the ::after coral, and
+   CLEAR the button's own background — painting the button bg made a SQUARE that peeked
+   out at the corners around the rounded ::after (Justin's "coral square around a
+   rounded blue square"). The icon is a mask whose colour follows currentColor, so
+   `color:#fff` whitens the glyph; the explicit .tlui-icon bg is belt-and-suspenders. */
+.tlui-button__tool[data-state="selected"] {
+  background-color: transparent !important;   /* was coral — that was the stray square */
+  color: #fff !important;
+}
+.tlui-button__tool[data-state="selected"]::after {
+  background-color: var(--fm-coral) !important;   /* the real rounded highlight → coral */
+}
+.tlui-button__tool[data-state="selected"] .tlui-icon {
+  background-color: #fff !important;
+}
+
+/* Non-selected tool hover → light gray (prototype .tool:hover #F8F9FA). On the SAME
+   rounded ::after layer as the selected highlight (not the button bg), so hover is a
+   clean rounded gray — painting the button bg here would make the same stray square. */
+.tlui-button__tool:not([data-state="selected"]):hover::after {
+  background-color: #F8F9FA !important;
+}
+
+/* ----------------------------------------------------------------------------
+   B4. ✅ CONFIRMED live 6/1 — Settings toggles → ON: Success green, OFF: neutral.
+       BBB's toggle is a styled-component with hashed classes; the two STABLE
+       hooks are the native <input type="checkbox"> (checked = ON) and the track
+       div's aria-hidden="true". Climb with :has() then paint the track.
+       INTENTIONALLY GLOBAL (confirmed by Justin, 6/3, after Opus review flagged the
+       broad selector): this brands EVERY toggle switch across the client — not just
+       Settings — for consistency. Targets the toggle-switch DOM shape (checkbox +
+       aria-hidden track), not plain checkboxes. If a non-toggle ever miscolors,
+       scope this to #fsmodal. Not an oversight — do not "fix" without that context. */
+
+/* ON → Success green */
+div:has(> input[type="checkbox"]:checked) > div[aria-hidden="true"],
+div:has(> input[type="checkbox"]:checked) > div[aria-hidden="true"] * {
+  background-color: var(--fm-success) !important;
+}
+
+/* OFF → neutral gray (red is reserved for DANGER, not an off state) */
+div:has(> input[type="checkbox"]:not(:checked)) > div[aria-hidden="true"],
+div:has(> input[type="checkbox"]:not(:checked)) > div[aria-hidden="true"] * {
+  background-color: var(--fm-neutral-off) !important;
+}
+
+/* ----------------------------------------------------------------------------
+   B5. ✅ Modals — scrim + primary button (AD Findings 6 & 7)
+   ---------------------------------------------------------------------------- */
+
+/* Consistent plum-tinted scrim across ALL modals */
+[data-test="modalOverlay"],
+.ReactModal__Overlay {               /* ⚠️ verify class — react-modal default */
+  background-color: rgba(62, 58, 110, 0.55) !important;  /* Plum #3E3A6E @ 55% — matches the new chrome-bar plum (was #403770) */
+}
+
+/* Modal primary button (Settings → Save / confirm dialogs): SHAPE only — radius
+   11px to match the prototype's .set-save. COLOR (flat coral in every state) is now
+   handled by the UNIFIED primary-coral rule in B2 — see there. */
+[data-test="modalConfirmButton"],
+[data-test="confirmButton"] {
+  border-radius: 11px !important;
+}
+
+/* Close / dismiss button (secondary, e.g. Settings → Close): round its HOVER box.
+   BBB paints a gray hover background with SQUARE corners on secondary buttons;
+   the button is transparent at rest, so only the sharp rectangle shows on hover.
+   8px matches the prototype's .set-close (smaller than Save's 11px). Invisible at
+   rest, rounds the box on hover. Stable hook: data-test="modalDismissButton". */
+[data-test="modalDismissButton"] {
+  border-radius: 8px !important;
+}
+
+/* ----------------------------------------------------------------------------
+   B6. Links → Coral 60
+   ---------------------------------------------------------------------------- */
+a, a:visited { color: var(--fm-link); }
+a:hover      { color: var(--fm-coral-active); }
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   C. SHAPE + SPACING  —  from fullmind-bbb-enhance.css (DOM-verified live 6/1)
+      Built only on [data-test] hooks confirmed present in a console audit of all
+      73 live hooks. NOTE: some shape rules first dropped as dead (sendMessageButton,
+      modalConfirmButton, confirmButton, whiteboard) were later RE-ADDED with
+      DOM-verified hooks on 6/3 — sendMessageButton radius in §D, modal/confirm radius
+      in §B5, whiteboard border in §B3. Only #cameraDock shape stays out.
+   ████████████████████████████████████████████████████████████████████████████ */
+
+/* C1. SHAPE — keep the stage SQUARE on purpose. */
+
+/* Presentation / whiteboard stage — SQUARE corners (border-radius 0), full-bleed.
+   Rounding it (was 14px) created small dark gaps at the corners where the stage met
+   the chat/notes panel. Squared per Justin 6/3 so it sits flush. B3 sets this
+   element's light stage background; different property, no conflict.
+   ⚠️ DO NOT try to INSET the board from CSS (padding here, OR shrinking the wrapper
+   child) — BOTH tested 6/3, both CROP. BBB writes the stage geometry inline as
+   absolute px and renders the ENTIRE presentation (slide, bottom slide-nav, logo,
+   blue editor frame) to that size; shrinking any element just clips those edge
+   controls instead of scaling. A floating/inset board is PLUGIN work — feed BBB's
+   layout a smaller presentation bound so it re-fits everything together. Logged. */
+[data-test="presentationContainer"] {
+  border-radius: 0;
+  overflow: hidden;
+}
+
+/* C1a. WHITEBOARD CARD — round the board's corners (SHAPE half; white fill + gray
+   border in §B3). 14px matches the prototype. overflow:hidden clips the square slide
+   content to the rounded shape (without it the slide's square corners poke past the
+   rounded border). The corners reveal presentationContainer's light --fm-stage bg, so
+   no dark gaps. FLUSH only — NO inset (inset crops; see §B3 note + README).
+   ⚠️ Re-test: confirm the bottom slide-nav and the bottom-RIGHT presenter logo aren't
+   clipped by the 14px corner radius. If a corner control gets cut, drop to ~8px here
+   or remove overflow:hidden (accepting square content corners over the rounded border). */
+[data-test="whiteboard"],
+[data-test="mainWhiteboard"] {
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+/* C1b. STAGE-EDGE DIVIDER — REMOVED 6/3. It was a 6px deep-plum left border on
+   presentationContainer, purpose-built to blend INTO the old deep-plum letterbox.
+   Now that the stage is LIGHT (prototype "letterbox" direction), a plum stripe
+   would stand out instead of blending, so it's gone — panel/stage separation now
+   relies on the panel's own edge, as in the prototype.
+   ⚠️ WATCH on re-test: the bug this originally fixed was "the separator vanishes
+   when you resize the chat panel." If that returns on the light stage, re-add a
+   THIN light-gray border here (e.g. 1px solid #E6EAEE) instead of the plum one. */
+
+/* Modals + dialog panels (appear on open: settings, about, leave-confirm). */
+[role="dialog"],
+.ReactModal__Content {                /* react-modal fallback class */
+  border-radius: 16px;
+}
+
+/* Settings modal tabs (Application / Notifications / Data savings) → round to 11px
+   like the prototype's .set-navitem. The SELECTED tab's coral fill already comes
+   from --color-primary; this just softens its corners. DOM-verified 6/3:
+   <li role="tab" aria-selected="true"> inside <div id="fsmodal">. Scoped to #fsmodal
+   so it can't touch other [role="tab"] lists elsewhere in BBB. */
+#fsmodal [role="tab"] {
+  border-radius: 11px !important;
+}
+
+/* Settings dropdowns (e.g. Application → language picker) → match the prototype's
+   .sr-select: white box, Gray-300 border, 10px radius, CORAL focus border (kills
+   BBB's default blue focus). Scoped to #fsmodal so it only touches Settings selects.
+   ⚠️ Targets native <select>; if BBB renders the picker as a custom styled-component
+   dropdown instead, this won't match — re-inspect live and re-anchor on its hook.
+   Native <select> styling is limited, but border + radius + focus are reliable. */
+#fsmodal select {
+  border: 1px solid #DEE2E6 !important;   /* Gray 300 */
+  border-radius: 10px !important;
+}
+#fsmodal select:focus {
+  border-color: var(--fm-coral) !important;   /* coral focus, not BBB blue */
+  outline: none !important;
+}
+
+/* Notification toasts — on-brand pill (pairs with the --toastify-* colours in B1
+   and the planned notifications plugin). Confirmed hooks. */
+[data-test="toastContainer"],
+[data-test="toastSmallMsg"] {
+  border-radius: 12px;
+}
+
+/* Leave / logout control (top-right) — confirmed real hook. B2 sets its red bg. */
+[data-test="leaveMeetingDropdown"] {
+  border-radius: 12px;
+}
+
+/* C2. SHADOW — gentle plum-tinted depth on floating surfaces only. */
+[role="dialog"],
+.ReactModal__Content {
+  box-shadow: 0 12px 30px -10px rgba(39, 34, 68, .45);   /* Plum-deep @ ~45% */
+}
+
+/* C3. DENSITY — small, safe spacing on the one confirmed list hook. */
+[data-test="userListItem"] {
+  padding-top: 6px;
+  padding-bottom: 6px;
+}
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   D. CHAT PANEL — Public Chat composer + Send, toward the 6/2 prototype.
+      DOM-verified 6/3. Stable hooks: #message-input (id), data-test="sendMessageButton",
+      data-test="chatTitle"/"hidePublicChat". The chat MESSAGE BUBBLES + sender-name
+      colors are NOT here yet — the live capture only had a SYSTEM message, not a user
+      chat message, so that structure is still unknown (TODO: capture a user message).
+   ████████████████████████████████████████████████████████████████████████████ */
+
+/* Composer divider — restore the separator above the input (prototype .composer
+   border-top). form:has(#message-input) = the composer form, reached via the stable id. */
+form:has(#message-input) {
+  border-top: 1px solid #E6EAEE !important;   /* prototype --line */
+  padding-top: 8px !important;
+}
+
+/* Composer input box → ONE box, prototype .composer input look. BBB's VISIBLE box is
+   the WRAPPER around the textarea (.sc-lopPiv), and it focus/hover-highlights BLUE;
+   styling the textarea too made a box-in-a-box. So: make the WRAPPER the single box
+   (white, Gray-300 border, 10px radius, CORAL focus — not blue) and the textarea
+   transparent/borderless inside it. :has(> #message-input) targets the hashed wrapper
+   stably; :focus-within fires when the textarea inside is focused. */
+:has(> #message-input) {
+  background-color: #fff !important;
+  border: 1px solid #DEE2E6 !important;       /* Gray 300, default */
+  border-radius: 10px !important;
+  box-shadow: none !important;
+}
+:has(> #message-input):hover {
+  border-color: #DEE2E6 !important;            /* kill BBB's blue hover (prototype has none) */
+  box-shadow: none !important;
+}
+:has(> #message-input):focus-within {
+  border-color: var(--fm-coral) !important;    /* coral focus, not BBB blue */
+  box-shadow: none !important;
+}
+/* textarea itself → transparent, no border/box, so there's no SECOND box */
+#message-input {
+  background: transparent !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  box-shadow: none !important;
+  outline: none !important;
+  color: var(--fm-text) !important;
+  font-size: 13px !important;
+}
+
+/* Send button → rounded square (prototype .send = 10px radius), not BBB's default.
+   Its coral fill/flat-hover come from the UNIFIED primary-coral rule in B2.
+   margin-left adds the gap from the input box (prototype .composer gap:8px) — BBB
+   renders the input + Send flush, so the button looked fused to the field. */
+[data-test="sendMessageButton"] {
+  border-radius: 10px !important;
+  overflow: hidden !important;   /* clip the inner coral <span> to the 10px radius — without this its squared corners spill past the rounded button (same fix as actionsButton / font-size buttons) */
+  margin-left: 8px !important;
+}
+
+/* User message bubble — ONE gentle gray bubble per message (prototype .mt). BBB nests
+   the text in containers (.chat-message-content → inner wrapper → messageContent) and
+   gives an OUTER one its own light background, so styling the inner one created a
+   box-in-a-box. Fix: strip the background off the outer wrapper(s) so only ONE box
+   remains, and make messageContent the single bubble. The inner hashed wrapper is
+   reached stably via :has(> [data-test="messageContent"]). */
+.chat-message-content,
+.chat-message-content > div:has(> [data-test="messageContent"]) {
+  background-color: transparent !important;
+}
+[data-test="messageContent"] {
+  background-color: #F4F7F9 !important;   /* prototype --sunken, gentle gray */
+  border-radius: 10px !important;
+  padding: 8px 11px !important;
+  margin-top: 4px !important;
+  color: var(--fm-text) !important;
+  font-size: 12.5px !important;           /* prototype .mt — BBB renders larger */
+  line-height: 1.45 !important;
+  font-weight: 400 !important;
+}
+[data-test="messageContent"] p {
+  margin: 0 !important;
+  font-size: inherit !important;          /* inherit the 12.5px bubble size */
+}
+
+/* Chat avatars (colored initials) → rounded square like the prototype's .mav (BBB
+   renders them as circles). The per-user color stays — it comes from BBB's
+   color="#…" attribute, which CSS can't turn into the prototype's gradient. Hook:
+   a HEX color attr inside the chat list. Buttons use color="primary"/"light"/"default"
+   (never hex), so [color^="#"] hits ONLY avatars. */
+#chat-list [color^="#"] {
+  border-radius: 8px !important;
+}
+
+/* TODO (no stable hook): sender-name color (prototype steel #6EA3BE) and the
+   "You = coral" own-message treatment. The name <div> carries only hashed classes,
+   and nothing in the captured DOM marks a message as the local user's. Need either a
+   stable hook (re-inspect an OWN message's chatMessageItem wrapper for a marker) or
+   accept these stay BBB-default. NOT built on fragile hashed-class chains. */
+
+/* Hide the DUPLICATE Fullmind logo in BBB's native branding area (the top-left
+   logo from the create-call logo= param). The rebuild keeps the Navbar logo only;
+   this brandingArea copy is redundant. Stable hook: data-test="brandingArea". */
+[data-test="brandingArea"] {
+  display: none !important;
+}
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   E. MEDIA BUTTONS (bottom action bar) — SIMPLE on/off, ONE pattern for the whole bar.
+      DOM-verified 6/3 (full bar dump): EVERY button in this bar is
+      `button.buttonWrapper` carrying the `lg` size class, and BBB flips ONE attribute
+      to signal state — color="default" (OFF) ↔ color="primary" (ON). So the entire bar
+      is two rules:
+        OFF → white circle, dark glyph
+        ON  → solid coral circle, white glyph        (coral = on, white = off)
+      No outline/ring (removed — the old :focus ring LINGERED until you clicked away).
+      Letting BBB's own [color] flag carry the state means this tracks on/off with ZERO
+      per-button enumeration AND survives the data-test SWAP (joinVideo→leaveVideo,
+      startScreenShare→stopScreenShare) that broke every earlier attempt.
+      Scoping hook = .buttonWrapper.lg — the bar's large round buttons. The small dropdown
+      chevrons beside mic/CC are NOT .buttonWrapper.lg, so they stay untouched; the chat
+      Send button (primary, but not .lg) is likewise unaffected (keeps §D's rounded square).
+      Specificity: button.buttonWrapper.lg[color] = (0,3,1) beats BBB's .sc-x.sc-x[:hover]
+      (0,2–3,0) !important paint. ⚠ Re-verify `.lg`+`buttonWrapper` after a BBB upgrade.
+      Reactions is an inline SVG (fill="currentcolor") → we set color AND fill.
+   ████████████████████████████████████████████████████████████████████████████ */
+
+/* OFF — white circle, dark glyph */
+button.buttonWrapper.lg[color="default"] {
+  background-color: #fff !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  outline: none !important;
+  box-shadow: 0 2px 7px -1px rgba(0,0,0,.28) !important;   /* matches prototype .btn-circle */
+}
+button.buttonWrapper.lg[color="default"]:hover {
+  background-color: #EEF1F4 !important;       /* light-gray hover */
+  box-shadow: 0 3px 10px -1px rgba(0,0,0,.32) !important;
+}
+button.buttonWrapper.lg[color="default"] [color="default"],
+button.buttonWrapper.lg[color="default"] i,
+button.buttonWrapper.lg[color="default"] svg,
+button.buttonWrapper.lg[color="default"] svg * {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: var(--fm-text) !important;           /* dark glyph (font icons + currentColor SVG) */
+  fill: var(--fm-text) !important;
+}
+
+/* ON — solid coral circle, white glyph */
+button.buttonWrapper.lg[color="primary"] {
+  background-color: var(--fm-coral) !important;
+  border-radius: 50% !important;
+  overflow: hidden !important;
+  outline: none !important;                    /* NO ring — coral fill alone signals "on" */
+  box-shadow: 0 2px 7px -1px rgba(0,0,0,.28) !important;
+}
+button.buttonWrapper.lg[color="primary"]:hover {
+  background-color: var(--fm-coral-hover) !important;  /* Coral 60 token — bar toggles DO darken on hover (deliberate exception to the §B2 flat-coral rule: a toggle benefits from hover feedback) */
+}
+button.buttonWrapper.lg[color="primary"] [color="primary"],
+button.buttonWrapper.lg[color="primary"] i,
+button.buttonWrapper.lg[color="primary"] svg,
+button.buttonWrapper.lg[color="primary"] svg * {
+  background-color: transparent !important;
+  box-shadow: none !important;
+  color: #fff !important;                      /* white glyph */
+  fill: #fff !important;
+}
+
+
+/* ████████████████████████████████████████████████████████████████████████████
+   F. NAVBAR LAYOUT — Fullmind header mockup (2026-06-03)
+      Live-mapped from the real <header id="Navbar"> (Justin's test room 6/3).
+      Target, left to right:  [Fullmind logo] [class subject ▾] ....... [bars][Leave][⋮]
+      EVERY control already exists in BBB's DOM — this section is LAYOUT ONLY. The
+      one net-new pixel is the logo (a decorative background image). REC and Leave
+      keep the brand colours already set in section B2 — not re-declared here.
+   ████████████████████████████████████████████████████████████████████████████ */
+
+/* F0. The logo is positioned ABSOLUTELY (F1), out of the flex flow — every in-flow
+   attempt (header child OR left-cluster child) lost the fight with BBB's own flex
+   rules and landed centred/wrapped/right. Out of flow, it answers to nothing. Here
+   we just open a left "gutter" by padding the header so BBB's real content
+   (title/controls) slides right of the logo and never overlaps it. Padding on a
+   flex container is safe: it shifts where the row begins, not how items lay out. */
+#Navbar {
+  padding-left: 198px;   /* gutter clearing the bigger absolute logo (24 + 160 + gap) */
+  padding-right: 12px;
+}
+
+/* Hide BBB's sidebar collapse chevron (‹) + user-list toggle (≡) in the header —
+   the mockup goes straight from logo to class subject. Panel-toggling moves to the
+   sidebar rail later (plugin work). REVERSIBLE: delete this block to restore them.
+   ⚠️ While hidden the header has no user-list toggle — fine for this visual test
+   since the panel is already open. We hide the WHOLE wrapper (the div that directly
+   holds the toggle) so its empty box doesn't keep reserving space and leave a gap
+   before the class title — that gap was why the title wasn't hugging the left.
+   ⚠️ STATE-DEPENDENT HOOK (fixed 6/3): BBB swaps the toggle button's data-test
+   between "toggleUserList" (no unread) and "hasUnreadMessages" (unread chat present).
+   The old rule only matched the first, so with unread messages the cluster stayed
+   visible and shoved the title right. Match BOTH states. (Belt-and-suspenders: also
+   key off the back-arrow icon, which shares this wrapper and is language-stable.) */
+#Navbar div:has(> [data-test="toggleUserList"]),
+#Navbar div:has(> [data-test="hasUnreadMessages"]),
+#Navbar div:has(> i.icon-bbb-left_arrow) {
+  display: none !important;
+}
+
+/* F0b. Pin the class-subject cluster HARD-LEFT by taking it OUT of flow — the §F0
+   lesson applied to the title. MEASURED 6/3: with the left cluster already hidden
+   (display:none confirmed), the title still sat 455px right of the navbar's left edge,
+   so BBB CENTRES it via its own flex distribution — an in-flow fix can't reach it
+   (the earlier justify-content:flex-start lost this fight, exactly like the logo did).
+   Absolutely position the cluster that DIRECTLY holds the title (sc-* hashed; reached
+   via :has(> presentationTitle)) at the logo gutter, vertically centred in the 85px
+   bar. #Navbar is position:absolute, so it is the containing block; no inline position
+   exists on this cluster, so !important wins cleanly. Out of flow, BBB's flex has
+   nothing to centre — the title sits right after the logo, matching the prototype.
+   NOTE: BBB groups the REC indicator in this same cluster, so it rides along to the
+   left for now; relocating REC to the right edge is a separate follow-up. */
+#Navbar div:has(> [data-test="presentationTitle"]) {
+  position: absolute !important;
+  left: 198px !important;          /* aligns with the F0 logo gutter — right after the wordmark */
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  margin: 0 !important;
+}
+
+/* F1. Fullmind wordmark — ABSOLUTELY positioned at the header's left edge, so it is
+   OUT of BBB's flex flow and can't be re-ordered, centred, or wrapped by BBB's own
+   layout (the F0 lesson). #Navbar is position:absolute, so it is the containing
+   block for this ::before; left:24 + translateY centres it vertically in the 85px
+   bar. The F0 header padding-left opens the gutter it sits in. Official mint
+   wordmark (reference asset fullmind-logo-mint.png, 1500x375, 4:1), embedded as a
+   data-URI so it needs ZERO hosting (works in Stylus today and in a future
+   userdata-bbb_custom_style_url drop-in). The faint mint reads as a crisp
+   near-white on the plum bar. pointer-events:none so it never eats a click. */
+#Navbar::before {
+  content: "";
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 5;
+  pointer-events: none;
+  width: 160px;
+  height: 40px;
+  background-image: url(data:image/png;base64,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);
+  background-repeat: no-repeat;
+  background-position: left center;
+  background-size: contain;
+}
+
+/* F2. Class-subject title → white, brand font, clear weight. The dropdown caret
+   (icon-bbb-device_list_selector) is BBB's native layout selector — kept as-is so
+   the control still works; it inherits this white colour. */
+#Navbar [data-test="presentationTitle"],
+#Navbar [data-test="presentationTitle"] span {
+  color: var(--fm-offwhite) !important;   /* #FFFCFA — was var(--fm-ink, …) but --fm-ink was never defined */
+  font-family: "Plus Jakarta Sans", system-ui, -apple-system, sans-serif !important;
+  font-size: 18px !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.01em;
+}
+
+/* F3. Drop the "|" divider the mockup doesn't have. Scoped to the decorative
+   aria-hidden pipe that directly follows the title, so nothing else is touched. */
+#Navbar [data-test="presentationTitle"] + span[aria-hidden="true"] {
+  display: none !important;
+}
+
+/* F4. Push the whole right control cluster (connection bars / Leave / Options) to
+   the right edge. Targeted by the cluster that CONTAINS the Leave button, so it
+   stays correct despite the wrapper's hashed styled-component class name. */
+#Navbar > div:has([data-test="leaveMeetingDropdown"]) {
+  margin-left: auto !important;
+}
+
+/* F5. REC POSITION (flagged tradeoff): BBB's DOM nests the recording indicator in
+   the LEFT (title) cluster, so for v1 it rides just after the class subject rather
+   than over in the right group like the mockup. Its colour/shape already come from
+   B2 (toned-red pill). Moving it into the right cluster needs display:contents
+   reparenting — a focused follow-up once this base is confirmed live. No rule here
+   on purpose: re-declaring it would duplicate B2 (manager rule #1). */
+
+
+/* ----------------------------------------------------------------------------
+   OUT OF SCOPE (documented, not done — carried over from v1):
+   • Shared Notes TEXT CANVAS — Etherpad iframe; CSS cannot cross it. The panel
+     chrome (header + B/I/U toolbar) IS reached by the rules above.
+   • Webcam-tile rounding — deferred until a call has cameras to verify.
+   • Camera/presentation resize divider — DELIBERATELY untouched (no stable hook).
+   • Richer features (LMS-aware timer, sidebar panel, in-room exit-ticket, branded
+     notifications) are PLUGIN work, not CSS — see prototype-01/PLUGIN-PLAN.md.
+   ---------------------------------------------------------------------------- */
