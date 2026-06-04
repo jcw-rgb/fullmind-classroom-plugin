@@ -13,61 +13,25 @@
 export type PluginApi = any;
 
 // ---------------------------------------------------------------------------
-// Mock data — IDs kept consistent so chat sender names resolve from userlist
+// Mock data — intentionally EMPTY so the preview shows the true fresh-room
+// state: no messages, no roster, no audio. This mirrors how the real plugin
+// starts in BBB (chat/notes empty, class empty until users join) — it carries
+// NO prepopulated names or messages. Add rows here only for a throwaway local
+// test; never commit fake content.
 // ---------------------------------------------------------------------------
-const MOCK_USERS = [
-  { userId: 'u-moderator-1', name: 'Ms. Rivera', role: 'MODERATOR' },
-  { userId: 'u-student-1',   name: 'Aiden Park',   role: 'VIEWER' },
-  { userId: 'u-student-2',   name: 'Sofia Okafor',  role: 'VIEWER' },
-  { userId: 'u-student-3',   name: 'Leo Fernandez', role: 'VIEWER' },
-  { userId: 'u-student-4',   name: 'Priya Nair',    role: 'VIEWER' },
-];
+const MOCK_USERS: Array<{ userId: string; name: string; role: string }> = [];
 
-const MOCK_MESSAGES = [
-  {
-    messageId: 'msg-1',
-    senderUserId: 'u-moderator-1',
-    message: 'Good morning everyone! Let\'s get started with today\'s lesson.',
-    createdAt: Date.now() - 300_000,
-    messageMetadata: {},
-  },
-  {
-    messageId: 'msg-2',
-    senderUserId: 'u-student-1',
-    message: 'Good morning Ms. Rivera!',
-    createdAt: Date.now() - 250_000,
-    messageMetadata: {},
-  },
-  {
-    messageId: 'msg-3',
-    senderUserId: 'u-student-2',
-    message: 'Will we be covering fractions today?',
-    createdAt: Date.now() - 200_000,
-    messageMetadata: {},
-  },
-  {
-    messageId: 'msg-4',
-    senderUserId: 'u-moderator-1',
-    message: 'Yes! We\'ll start with equivalent fractions and move on to adding them.',
-    createdAt: Date.now() - 150_000,
-    messageMetadata: {},
-  },
-  {
-    messageId: 'msg-5',
-    senderUserId: 'u-student-3',
-    message: 'I practiced last night!',
-    createdAt: Date.now() - 60_000,
-    messageMetadata: {},
-  },
-];
+const MOCK_MESSAGES: Array<{
+  messageId: string;
+  senderUserId: string;
+  message: string;
+  createdAt: string;
+  messageMetadata: Record<string, unknown>;
+}> = [];
 
-const MOCK_VOICES = [
-  { userId: 'u-moderator-1', talking: true,  muted: false, startTime: Date.now() - 5000 },
-  { userId: 'u-student-1',   talking: false, muted: true,  startTime: 0 },
-  { userId: 'u-student-2',   talking: false, muted: false, startTime: 0 },
-  { userId: 'u-student-3',   talking: false, muted: false, startTime: 0 },
-  { userId: 'u-student-4',   talking: false, muted: true,  startTime: 0 },
-];
+const MOCK_VOICES: Array<{
+  userId: string; talking: boolean; muted: boolean; startTime: number;
+}> = [];
 
 // ---------------------------------------------------------------------------
 // Mock API object returned by getPluginApi()
