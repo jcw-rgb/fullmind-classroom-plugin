@@ -26,7 +26,9 @@ import { NotesPanelView } from './notes-panel';
 //  • RAIL_TOP: px from the top so the rail sits below BBB's nav bar.
 const NATIVE_SIDEBAR_SELECTOR = '[data-test="userListContent"]'; // CONFIRM
 const STAGE_SELECTOR = '[data-test="presentationContainer"]'; // CONFIRM
-const RAIL_TOP = 92; // CONFIRM (BBB nav height in px)
+const RAIL_TOP = 124; // CONFIRM — band (32px, --fm-band-h) + BBB nav (~92px). The
+//   Session Progress band now reserves a strip ABOVE the navbar, so the rail must sit
+//   below BOTH (was 92 = nav only). Keep in step with --fm-band-h in fullmind-bbb-base.css.
 
 const RAIL_WIDTH = 64; // prototype .body grid col 1
 const PANEL_WIDTH = 264; // prototype .body.panel-open grid col 2
