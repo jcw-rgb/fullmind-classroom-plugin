@@ -3,18 +3,14 @@
 // own local copy (its documented self-contained choice); the new panels import these.
 export const FM = {
   plum: '#403770',
-  plumDeep: '#272244',
   coral: '#F37167',
-  coralActive: '#EC2213',
   ink: '#212529',
   inkDim: '#6C757D',
-  offwhite: '#FFFCFA',
   line: '#E6EAEE',
   surface: '#FFFFFF',
   sunken: '#F4F7F9',
   steel: '#6EA3BE',
   success: '#198754',
-  warning: '#FFC107',
   gray100: '#F8F9FA',
   ink2: '#495057',
   font: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
