@@ -1,35 +1,42 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
   PluginApi,
   FloatingWindow,
+  UserListUiDataNames,
+  LayoutPresentatioAreaUiDataNames,
+  UiLayouts,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
-import { ChatPanelView } from './chat-panel';
-import { ClassPanelView } from './class-panel';
-import { NotesPanelView } from './notes-panel';
 
 /**
- * Lesson Hub rail — the prototype's left .iconrail (Chat / Notes / Class) drawn by
- * the plugin as a fixed-position overlay inside an invisible FloatingWindow (same
- * trick the Session Progress bar uses). Owns its own open/close + active-tab state.
- * Panel bodies reuse the existing Views. Injects CSS to hide BBB's native sidebar
- * and to push (shrink) the stage when a panel is open.
+ * Lesson Hub rail — the prototype's left .iconrail (Chat / Notes / Class), drawn by
+ * the plugin as a fixed-position overlay inside an invisible FloatingWindow. The rail
+ * does NOT rebuild the panels: each button LAUNCHES BBB's own native panel, which the
+ * Fullmind CSS reskins. One chat, not two.
+ *   • Chat  → pluginApi.uiCommands.chat.form.open()  (SDK; open-only)
+ *   • Class → click BBB's native [data-test="toggleUserList"]
+ *   • Notes → click BBB's native Shared-Notes toggle (CONFIRM selector live)
+ * Active highlight: Class/Notes read native UI-data; Chat is best-effort click-tracking
+ * (reliable because the native chat/user-list toggles are hidden — see RAIL_LAYOUT_STYLE).
  */
 
 // ── LIVE-WIRE: BBB layout (CONFIRM IN LIVE ROOM) ─────────────────────────────
-// These reach into BBB's hashed layout — tune once in the test room.
-//  • NATIVE_SIDEBAR_SELECTOR: BBB's own sidebar/panel column to hide (prefer data-test).
-//  • STAGE_SELECTOR: the presentation/stage container to shrink (the "push").
-//  • RAIL_TOP: px from the top so the rail sits below BBB's nav bar.
-const NATIVE_SIDEBAR_SELECTOR = '[data-test="userListContent"]'; // CONFIRM
-const STAGE_SELECTOR = '[data-test="presentationContainer"]'; // CONFIRM
-const RAIL_TOP = 92; // CONFIRM (BBB nav height in px)
+// Native Shared-Notes toggle to click for the Notes tab. Best guess below.
+const SHARED_NOTES_TOGGLE = '[data-test="sharedNotesButton"]'; // CONFIRM
+// Native chat panel close control, for Chat toggle parity (chat.form.open is open-only).
+// querySelector returns the first DOM match — closePrivateChat takes priority over hidePublicChat.
+const CHAT_CLOSE_SELECTOR = '[data-test="closePrivateChat"], [data-test="hidePublicChat"]'; // CONFIRM
+// BBB's sidebar/panel container to shift right by the rail width so it sits beside us.
+const NATIVE_SIDEBAR_CONTAINER = '[data-test="userListContent"]'; // CONFIRM (the panel column)
+// Native toggles to hide so the rail is the single nav (still .click()-able while hidden).
+const NATIVE_USERLIST_TOGGLE = '[data-test="toggleUserList"]'; // CONFIRM
+const NATIVE_CHAT_TOGGLE = '[data-test="chatButton"]'; // CONFIRM
 
-const RAIL_WIDTH = 64; // prototype .body grid col 1
-const PANEL_WIDTH = 264; // prototype .body.panel-open grid col 2
+const RAIL_TOP = 92; // CONFIRM (BBB nav height in px)
+const RAIL_WIDTH = 64; // prototype .iconrail width
 
 type Tab = 'chat' | 'notes' | 'class';
 const TABS: Tab[] = ['chat', 'notes', 'class'];
@@ -62,7 +69,6 @@ const ICONS: Record<Tab, React.ReactElement> = {
 };
 
 // createdAt is a string in the SDK type; format unconfirmed (epoch-ms string or ISO).
-// CONFIRM the format in the test room if the badge count looks wrong.
 function parseTime(v: string): number {
   const n = Number(v);
   if (Number.isFinite(n) && n > 1e11) return n; // epoch ms (~13 digits)
@@ -70,49 +76,65 @@ function parseTime(v: string): number {
   return Date.parse(v); // ISO 8601
 }
 
-// NOTE: margin-left works when the stage container is in normal flow. If BBB's stage
-// container is absolutely-positioned, margin-left shifts it right without shrinking its
-// width (the right edge overflows). In that case — if the stage shifts but doesn't
-// reflow narrower in the test room — switch the rule to width / left / right instead of
-// margin-left.
-const RAIL_STYLE = `
-  ${NATIVE_SIDEBAR_SELECTOR} { display: none !important; }
-  ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH}px !important; transition: margin-left .18s ease; }
-  body.fm-hub-open ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH + PANEL_WIDTH}px !important; }
+// Shift BBB's native sidebar beside the rail; hide BBB's native chat/user-list toggles
+// so the rail is the single nav. display:none still allows programmatic .click().
+const RAIL_LAYOUT_STYLE = `
+  ${NATIVE_SIDEBAR_CONTAINER} { margin-left: ${RAIL_WIDTH}px !important; }
+  ${NATIVE_USERLIST_TOGGLE}, ${NATIVE_CHAT_TOGGLE} { display: none !important; }
 `;
+
+function clickNative(selector: string): void {
+  const el = document.querySelector<HTMLElement>(selector);
+  if (el) el.click();
+}
 
 export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 
-  const [active, setActive] = useState<Tab | null>(null);
+  // Best-effort chat-open tracking (no SDK is-open read for chat). Known gap: if the
+  // user closes the native chat panel via its in-panel ✕ (not the rail button),
+  // chatOpen stays true until they click the Chat rail button again. Accepted until
+  // the SDK exposes a chat-is-open data hook.
+  const [chatOpen, setChatOpen] = useState(false);
   const [lastChatOpenedAt, setLastChatOpenedAt] = useState<number>(() => Date.now());
 
+  // Native panel state (clean reads).
+  const userList = pluginApi.useUiData(UserListUiDataNames.USER_LIST_IS_OPEN, { value: false });
+  const presentationEls = pluginApi.useUiData(LayoutPresentatioAreaUiDataNames.CURRENT_ELEMENT, []);
+  const userListOpen = userList?.value ?? false;
+  const notesOpen = (presentationEls ?? []).some(
+    (e) => e.currentElement === UiLayouts.PINNED_SHARED_NOTES && e.isOpen,
+  );
+
+  // Unread badge: messages since Chat was last opened.
   const chatResponse = pluginApi.useLoadedChatMessages();
   const messages = chatResponse?.data ?? [];
+  const unread = chatOpen
+    ? 0
+    : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
 
-  // messages is a fresh array reference every render (SDK wrapper), so useMemo would
-  // recompute every render anyway. Filter is cheap — plain const is clearer.
-  const unread = active === 'chat' ? 0 : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
-
-  // Toggle the body class that drives the stage push.
-  useEffect(() => {
-    document.body.classList.toggle('fm-hub-open', active !== null);
-    return () => { document.body.classList.remove('fm-hub-open'); };
-  }, [active]);
-
-  const handleClick = (tab: Tab) => {
-    setActive((cur) => {
-      const next = cur === tab ? null : tab;
-      if (tab === 'chat' && next === 'chat') setLastChatOpenedAt(Date.now());
-      return next;
-    });
+  const isActive = (tab: Tab): boolean => {
+    if (tab === 'chat') return chatOpen;
+    if (tab === 'class') return userListOpen;
+    return notesOpen;
   };
 
-  let body: React.ReactNode = null;
-  if (active === 'chat') body = <ChatPanelView pluginUuid={pluginUuid} />;
-  else if (active === 'class') body = <ClassPanelView pluginUuid={pluginUuid} />;
-  else if (active === 'notes') body = <NotesPanelView />;
+  const handleClick = (tab: Tab): void => {
+    if (tab === 'chat') {
+      if (chatOpen) {
+        clickNative(CHAT_CLOSE_SELECTOR);
+        setChatOpen(false);
+      } else {
+        pluginApi.uiCommands.chat.form.open();
+        setChatOpen(true);
+        setLastChatOpenedAt(Date.now());
+      }
+      return;
+    }
+    if (tab === 'class') clickNative(NATIVE_USERLIST_TOGGLE);
+    else clickNative(SHARED_NOTES_TOGGLE);
+  };
 
   return (
     <div
@@ -126,9 +148,8 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
         fontFamily: FM.font,
       }}
     >
-      <style>{RAIL_STYLE}</style>
+      <style>{RAIL_LAYOUT_STYLE}</style>
 
-      {/* rail (prototype .iconrail) */}
       <div
         style={{
           width: RAIL_WIDTH,
@@ -142,7 +163,7 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
         }}
       >
         {TABS.map((tab) => {
-          const isActive = active === tab;
+          const active = isActive(tab);
           return (
             <button
               key={tab}
@@ -161,9 +182,9 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
                 alignItems: 'center',
                 gap: 4,
                 fontFamily: 'inherit',
-                background: isActive ? FM.coral : 'transparent',
-                color: isActive ? '#fff' : FM.ink2,
-                boxShadow: isActive ? '0 6px 14px -6px rgba(243,113,103,.6)' : 'none',
+                background: active ? FM.coral : 'transparent',
+                color: active ? '#fff' : FM.ink2,
+                boxShadow: active ? '0 6px 14px -6px rgba(243,113,103,.6)' : 'none',
               }}
             >
               {ICONS[tab]}
@@ -195,49 +216,6 @@ export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.Rea
           );
         })}
       </div>
-
-      {/* sliding panel (header + reused View body) */}
-      {active && (
-        <div
-          style={{
-            width: PANEL_WIDTH,
-            background: FM.surface,
-            borderRight: `1px solid ${FM.line}`,
-            height: '100%',
-            display: 'flex',
-            flexDirection: 'column',
-          }}
-        >
-          <div
-            style={{
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              padding: '13px 13px 11px',
-              borderBottom: `1px solid ${FM.line}`,
-            }}
-          >
-            <span style={{ fontSize: 14, fontWeight: 700, color: FM.plum }}>{LABELS[active]}</span>
-            <button
-              type="button"
-              aria-label="Close panel"
-              onClick={() => setActive(null)}
-              style={{
-                border: 0,
-                background: 'transparent',
-                cursor: 'pointer',
-                color: FM.inkDim,
-                fontSize: 18,
-                lineHeight: 1,
-                padding: 2,
-              }}
-            >
-              ×
-            </button>
-          </div>
-          <div style={{ flex: 1, minHeight: 0 }}>{body}</div>
-        </div>
-      )}
     </div>
   );
 }
