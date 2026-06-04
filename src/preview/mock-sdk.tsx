@@ -55,7 +55,7 @@ const MOCK_MESSAGES = [
   {
     messageId: 'msg-5',
     senderUserId: 'u-student-3',
-    message: 'I practiced last night 🙌',
+    message: 'I practiced last night!',
     createdAt: Date.now() - 60_000,
     messageMetadata: {},
   },
