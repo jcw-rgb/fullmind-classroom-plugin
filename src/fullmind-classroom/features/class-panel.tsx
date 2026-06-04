@@ -16,7 +16,7 @@ import { FM } from './theme';
 
 const CLASS_ICON = 'user';
 
-function ClassPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
+export function ClassPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 

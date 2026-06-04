@@ -20,7 +20,7 @@ import { FM } from './theme';
 // shows a fallback glyph in the live room, swap this for a confirmed icon name.
 const CHAT_ICON = 'chat';
 
-function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
+export function ChatPanelView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 

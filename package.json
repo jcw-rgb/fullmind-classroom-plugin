@@ -15,9 +15,10 @@
     "build-bundle": "webpack --mode production",
     "start": "webpack serve --mode development",
     "build:watch": "rm -rf dist && tsc -w --module CommonJS",
-    "lint": "eslint ./src/*",
+    "lint": "eslint ./src/index.tsx ./src/fullmind-classroom",
     "lint:fix": "npm run lint -- --fix",
-    "lint:watch": "watch 'yarn lint'"
+    "lint:watch": "watch 'yarn lint'",
+    "preview": "webpack serve --config webpack.preview.js --mode development"
   },
   "browserslist": {
     "production": [

@@ -22,7 +22,7 @@ const NOTES_PAD_URL = '';
 
 const NOTES_ICON = 'copy';
 
-function NotesPanelView(): React.ReactElement {
+export function NotesPanelView(): React.ReactElement {
   if (NOTES_PAD_URL) {
     return (
       <iframe
