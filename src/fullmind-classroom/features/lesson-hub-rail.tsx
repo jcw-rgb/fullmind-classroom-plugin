@@ -81,7 +81,7 @@ const RAIL_STYLE = `
   body.fm-hub-open ${STAGE_SELECTOR} { margin-left: ${RAIL_WIDTH + PANEL_WIDTH}px !important; }
 `;
 
-function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
+export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 

@@ -122,6 +122,15 @@ export class GenericContentSidekickArea {
 }
 
 // ---------------------------------------------------------------------------
+// FloatingWindow — no-op class; preview renders LessonHubView directly
+// ---------------------------------------------------------------------------
+export class FloatingWindow {
+  constructor(_opts: unknown) {
+    // no-op; the preview renders the View component directly, not via the factory
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Misc named exports the SDK normally provides (add more as needed)
 // ---------------------------------------------------------------------------
 export const pluginLogger = {
