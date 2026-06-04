@@ -77,17 +77,20 @@ unread badge) with three buttons whose `onClick` acts on native BBB:
 Kept as-is: reads `useLoadedChatMessages`, counts messages since Chat was last opened,
 clears on open. Genuinely additive, reads native data — not part of the duplication.
 
-### Layout coordination (CSS, in `fullmind-bbb-base.css`)
+### Layout coordination (plugin-injected `<style>`, not the global CSS file)
+The original rail already injected its own `<style>` block for layout coordination
+(sidebar-hide + push). The new rail keeps that pattern — it injects a single
+`<style>` so the layout rules live with the code that needs them, and the proven
+`fullmind-bbb-base.css` is left untouched (smaller blast radius).
+
 - The rail sits at `left:0`; BBB's native sidebar panel also opens at `left:0`. Shift
   BBB's sidebar/panel container right by the rail width (64px) so the layout reads
   **rail │ native panel │ stage**. Container selector is a `// CONFIRM IN LIVE ROOM`
   hook (prefer a `data-test` attribute).
 - Hide BBB's native chat + user-list toggle buttons (`[data-test="toggleUserList"]` and
-  the chat toggle — confirm chat's hook live) so the rail is the single nav. The buttons
-  are hidden visually only; the rail still programmatically clicks `toggleUserList`, so
-  it must stay in the DOM (`display:none` on a wrapper that keeps the button present, or
-  hide via a parent — confirm the click still fires on a `display:none` element; if not,
-  hide with `visibility/position` off-screen instead).
+  the chat toggle — confirm chat's hook live) so the rail is the single nav. Use
+  `display:none` — a `display:none` element still fires `HTMLElement.click()`
+  programmatically, so the rail can still click `toggleUserList` while it's hidden.
 
 ## Out of scope / follow-on
 - **CSS coverage gap.** The CSS provably reskins native *chat* (composer, bubbles,
@@ -112,6 +115,6 @@ clears on open. Genuinely additive, reads native data — not part of the duplic
 |---|---|
 | `SHARED_NOTES_TOGGLE` | native Shared-Notes toggle button to click for the Notes tab |
 | `CHAT_CLOSE_SELECTOR` | native chat panel close control (for Chat toggle parity) |
-| `NATIVE_SIDEBAR_CONTAINER` (CSS) | BBB's sidebar/panel container to shift +64px |
-| `NATIVE_CHAT_TOGGLE` (CSS) | native chat toggle button to hide |
+| `NATIVE_SIDEBAR_CONTAINER` | BBB's sidebar/panel container to shift +64px (plugin `<style>`) |
+| `NATIVE_CHAT_TOGGLE` | native chat toggle button to hide (plugin `<style>`) |
 | `RAIL_TOP` | px offset so the rail sits below BBB's nav bar (already exists) |
