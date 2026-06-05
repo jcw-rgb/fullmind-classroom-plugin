@@ -1,225 +1,173 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
-  PluginApi,
   FloatingWindow,
 } from 'bigbluebutton-html-plugin-sdk';
 import { FM } from './theme';
 
 /**
- * Lesson Hub rail — the prototype's left .iconrail (Chat / Notes / Class), drawn by
- * the plugin as a fixed overlay inside an invisible FloatingWindow. The rail is the
- * SOLE nav: it hides BBB's native combined sidebar and drives BBB's own panels.
+ * Lesson Hub — SEAMLESS nav reskin (pure CSS).
  *
- * BBB reality (confirmed from the live DOM): the left column [userListContainer] is a
- * SINGLE sidebar stacking three sections — Messages (chat list), Notes (shared-notes),
- * Users (roster). There are no three separately-toggled panels. So:
- *   • Chat  → pluginApi.uiCommands.chat.form.open()  (SDK; open-only)
- *   • Notes → click BBB's native [data-test="sharedNotesButton"]
- *   • Class → reveal the native sidebar but CSS-hide its Messages + Notes sections,
- *             leaving the roster only (BBB keeps the roster inside this sidebar).
+ * Background: the earlier rail REFLOWED BBB's columns (forcing the open panel to left:64 and
+ * resizing the whiteboard). That column-moving is what made the whiteboard pop on every switch —
+ * proven by measuring bbb0 with NO plugin, where chat↔notes leaves the whiteboard perfectly still
+ * (BBB reuses one content node and never moves it).
  *
- * Highlight: a single local `active` tab. Because the rail is the only nav (native
- * sidebar hidden), local state is authoritative — exactly one highlight at a time.
+ * So this version moves NOTHING and — critically — mutates NO DOM. An earlier attempt rewrote the
+ * nav items' innerHTML + ran a MutationObserver; that fought BBB's React reconciliation and crashed
+ * the client ("Oops, something went wrong"). The fix is to reskin BBB's native nav with PURE CSS:
+ *   • relabel via ::after ("Public Chat" → "Chat", "Shared Notes" → "Notes"), hiding BBB's own text
+ *     with font-size:0 and its icon glyph with display:none;
+ *   • draw the Fullmind outline icons via ::before using a CSS mask (so they inherit text colour —
+ *     grey normally, white on the coral active tab);
+ *   • colour the active tab coral via BBB's own [aria-expanded="true"] (it sets this on the open
+ *     nav item — no JS needed to track state);
+ *   • hide BBB's "Messages"/"Notes" section headers.
+ *
+ * No reflow, no FloatingWindow rail, no DOM mutation, no observer — the plugin only injects this
+ * stylesheet. BBB owns the layout, so chat↔notes is seamless exactly like a default room.
  */
 
-// ── BBB layout hooks ─────────────────────────────────────────────────────────
-// Confirmed from the live DOM (2026-06-04):
-const SIDEBAR_CONTAINER = '[data-test="userListContainer"]'; // the whole Messages/Notes/Users column
-const SIDEBAR_CONTENT = '[data-test="userListContent"]';
-const MESSAGES_TITLE = '[data-test="messageTitle"]'; // marks the Messages section
-const NOTES_TITLE = '[data-test="notesTitle"]'; // marks the Notes section
-const SHARED_NOTES_TOGGLE = '[data-test="sharedNotesButton"]'; // opens/closes Shared Notes
-// Only appears once the chat panel is open, so confirm live:
-const CHAT_CLOSE_SELECTOR = '[data-test="hidePublicChat"], [data-test="closePrivateChat"]'; // CONFIRM
+// Fullmind outline icons → CSS mask URLs (built at load; encodeURIComponent avoids hand-escaping).
+const SVG_OPEN = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" '
+  + 'stroke="black" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">';
+const maskUrl = (paths: string): string => `url("data:image/svg+xml,${encodeURIComponent(`${SVG_OPEN}${paths}</svg>`)}")`;
+const CHAT_MASK = maskUrl('<path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>');
+const NOTES_MASK = maskUrl(
+  '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M9 13h6M9 17h4"/>',
+);
 
-const RAIL_TOP = 92; // CONFIRM (BBB nav height in px)
-const RAIL_WIDTH = 64; // prototype .iconrail width
-
-type Tab = 'chat' | 'notes' | 'class';
-const TABS: Tab[] = ['chat', 'notes', 'class'];
-const LABELS: Record<Tab, string> = { chat: 'Chat', notes: 'Notes', class: 'Class' };
-
-const svgProps = {
-  viewBox: '0 0 24 24',
-  fill: 'none',
-  stroke: 'currentColor',
-  strokeWidth: 1.75,
-  strokeLinecap: 'round' as const,
-  strokeLinejoin: 'round' as const,
-  style: { width: 22, height: 22 },
-};
-const ICONS: Record<Tab, React.ReactElement> = {
-  chat: (<svg {...svgProps}><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>),
-  notes: (
-    <svg {...svgProps}>
-      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
-      <path d="M14 2v6h6M9 13h6M9 17h4" />
-    </svg>
-  ),
-  class: (
-    <svg {...svgProps}>
-      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
-      <circle cx="9" cy="7" r="4" />
-      <path d="M23 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" />
-    </svg>
-  ),
-};
-
-// createdAt is a string in the SDK type; format unconfirmed (epoch-ms string or ISO).
-function parseTime(v: string): number {
-  const n = Number(v);
-  if (Number.isFinite(n) && n > 1e11) return n; // epoch ms (~13 digits)
-  if (Number.isFinite(n) && n > 1e8) return n * 1000; // epoch seconds (~10 digits)
-  return Date.parse(v); // ISO 8601
-}
-
-// Hide BBB's native combined sidebar by default; the rail is the sole nav. When the
-// Class tab is active, reveal the sidebar but hide its Messages + Notes sections via
-// :has() so only the roster shows, shifted right of the rail.
-const RAIL_LAYOUT_STYLE = `
-  body:not(.fm-class-active) ${SIDEBAR_CONTAINER} { display: none !important; }
-  body.fm-class-active ${SIDEBAR_CONTAINER} { margin-left: ${RAIL_WIDTH}px !important; }
-  body.fm-class-active ${SIDEBAR_CONTENT} > div:has(${MESSAGES_TITLE}),
-  body.fm-class-active ${SIDEBAR_CONTENT} > div:has(${NOTES_TITLE}) { display: none !important; }
+// Pure-CSS reskin of BBB's native sidebar nav. POSITION is untouched (BBB owns it) — cosmetic only.
+const RESKIN_STYLE = `
+  [data-test="userListContainer"] {
+    /* Gray-100 rail so the nav reads as a distinct column from the white Chat/Notes panel that
+       extends out beside it — the tone shift separates them, no border needed. Token lives in the
+       base CSS :root; fallback keeps the rail grey even if the base CSS hasn't loaded yet. */
+    background: var(--fm-gray-100, ${FM.gray100}) !important;
+    font-family: ${FM.font} !important;
+  }
+  /* remove BBB's grey scroll-fade gradient behind the nav rows (it's a background-IMAGE, not a
+     colour — that's the "grey boxes"). Our icons use mask-image, so they're unaffected. */
+  [data-test="userListContainer"] * { background-image: none !important; }
+  /* hide BBB's section headers */
+  [data-test="messageTitle"], [data-test="notesTitle"] { display: none !important; }
+  /* Chat + Notes → clean Fullmind tabs. Hiding BBB's child wrapper drops its built-in label + icon
+     AND lets our ::before icon + ::after label sit together right after each other at the left. */
+  [data-test="chatButton"] > *, [data-test="sharedNotesButton"] > * { display: none !important; }
+  [data-test="chatButton"], [data-test="sharedNotesButton"] {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: flex-start !important;
+    gap: 10px !important;
+    /* width keeps the rounded box inside the 240px nav — without it the button stretches past the
+       container's right edge and the overflow:hidden parent clips the right corners square. */
+    width: calc(100% - 16px) !important;
+    box-sizing: border-box !important;
+    margin: 2px 8px !important;
+    padding: 9px 12px !important;
+    border-radius: 10px !important;
+    border: 0 !important;
+    cursor: pointer !important;
+    color: ${FM.ink2} !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    outline: none !important;
+  }
+  /* our outline icons via mask (inherit colour → white on the coral active tab) */
+  [data-test="chatButton"]::before, [data-test="sharedNotesButton"]::before {
+    content: "" !important;
+    flex: 0 0 22px !important;
+    width: 22px !important;
+    height: 22px !important;
+    background-color: currentColor !important;
+    -webkit-mask-size: contain !important; mask-size: contain !important;
+    -webkit-mask-repeat: no-repeat !important; mask-repeat: no-repeat !important;
+    -webkit-mask-position: center !important; mask-position: center !important;
+  }
+  [data-test="chatButton"]::before { -webkit-mask-image: ${CHAT_MASK} !important; mask-image: ${CHAT_MASK} !important; }
+  [data-test="sharedNotesButton"]::before { -webkit-mask-image: ${NOTES_MASK} !important; mask-image: ${NOTES_MASK} !important; }
+  /* our labels (smaller) */
+  [data-test="chatButton"]::after, [data-test="sharedNotesButton"]::after {
+    font: 600 13px/1 ${FM.font} !important;
+  }
+  [data-test="chatButton"]::after { content: "Chat" !important; }
+  [data-test="sharedNotesButton"]::after { content: "Notes" !important; }
+  /* hover: BBB-style grey box, rounded (declared BEFORE active so active wins on the open tab) */
+  [data-test="chatButton"]:hover, [data-test="sharedNotesButton"]:hover { background: #e9ecef !important; }
+  /* coral active tab — BBB sets aria-expanded="true" on the open nav item (no JS needed).
+     color:#fff turns BOTH the ::after label and the ::before icon white (the icon uses
+     background-color:currentColor, so it inherits this). */
+  [data-test="chatButton"][aria-expanded="true"], [data-test="sharedNotesButton"][aria-expanded="true"] {
+    background: ${FM.coral} !important;
+    color: #fff !important;
+    box-shadow: 0 6px 14px -6px rgba(243, 113, 103, 0.6) !important;
+  }
+  /* user rows hover — same light grey (Gray 200) as the Chat/Notes hover, so the whole nav matches */
+  [data-test="userListContainer"] li:hover,
+  [data-test="userListItemCurrent"]:hover,
+  [data-test="userListItem"]:hover { background: #e9ecef !important; border-radius: 10px !important; }
+  [data-test="userListContainer"] h2 {
+    font: 700 11px/1 ${FM.font} !important;
+    letter-spacing: 0.06em !important;
+    text-transform: uppercase !important;
+    color: #adb5bd !important;
+    padding: 14px 14px 6px !important;
+  }
+  /* chat Send button → coral + rounded (the blue lived on the inner span[color="primary"]) */
+  [data-test="sendMessageButton"], [data-test="sendMessageButton"] span[color="primary"] {
+    background-color: ${FM.coral} !important;
+    border-radius: 10px !important;
+  }
+  /* Unified GREY-OVERLAY hover for every coloured button — Send + action bar + Present + Raise hand.
+     One inset translucent NEUTRAL grey (Gray 600 @ 18%) flooding the button: over a white circle it
+     resolves to ~#e6e6e8 (matching the Chat/Notes/user grey); over the coral Send/active button it
+     greys the coral toward neutral — never a brighter or darker coral. filter:none kills any leftover
+     brightness hover. The shadow respects each button's own border-radius, so circles stay circular. */
+  [data-test="sendMessageButton"]:hover,
+  [data-test="actionsButton"]:hover,
+  [data-test="unmuteMicButton"]:hover, [data-test="muteMicButton"]:hover,
+  [data-test="joinVideo"]:hover, [data-test="leaveVideo"]:hover,
+  [data-test="startScreenShare"]:hover, [data-test="stopScreenShare"]:hover,
+  [data-test="reactionsButton"]:hover,
+  [data-test="raiseHandBtn"]:hover {
+    box-shadow: inset 0 0 0 999px rgba(108, 117, 125, 0.18) !important;
+    filter: none !important;
+  }
 `;
 
-function clickNative(selector: string): void {
-  const el = document.querySelector<HTMLElement>(selector);
-  if (el) el.click();
+// Load the global base reskin (plum bars, Fullmind logo, fonts) alongside the plugin. bbb0-v3
+// ignores the `userdata-bbb_custom_style_url` room param, so the CSS used to be hand-injected —
+// which a page reload always wiped ("css is not loaded"). Instead we derive the base-CSS URL from
+// the plugin's OWN script origin (tunnel in dev, S3 in prod) and append a <link> to <head> once.
+// Appending a fresh <link> is safe — it never touches BBB's React tree, so it can't crash BBB.
+function ensureBaseCssLink(): void {
+  if (typeof document === 'undefined' || document.getElementById('fm-base-css')) return;
+  const self = Array.from(document.querySelectorAll('script[src]'))
+    .find((s) => /FullmindClassroom\.js/i.test((s as HTMLScriptElement).src)) as
+      HTMLScriptElement | undefined;
+  if (!self) {
+    // eslint-disable-next-line no-console
+    console.warn('[FullmindClassroom] plugin script not found — base reskin CSS not loaded');
+    return;
+  }
+  const url = new URL('fullmind-bbb-base.css', self.src);
+  // carry the script's ?version= so the CSS busts cache in lockstep with the plugin bundle
+  url.search = new URL(self.src).search;
+  const link = document.createElement('link');
+  link.id = 'fm-base-css';
+  link.rel = 'stylesheet';
+  link.href = url.href;
+  document.head.appendChild(link);
 }
 
 export function LessonHubView({ pluginUuid }: { pluginUuid: string }): React.ReactElement {
   BbbPluginSdk.initialize(pluginUuid);
-  const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
-
-  // Single local active tab — authoritative because the rail is the only nav.
-  const [active, setActive] = useState<Tab | null>(null);
-  const [lastChatOpenedAt, setLastChatOpenedAt] = useState<number>(() => Date.now());
-
-  // Class tab drives a body class that reveals the roster-only native sidebar.
-  useEffect(() => {
-    document.body.classList.toggle('fm-class-active', active === 'class');
-    return () => document.body.classList.remove('fm-class-active');
-  }, [active]);
-
-  // Unread badge: messages since Chat was last opened.
-  const chatResponse = pluginApi.useLoadedChatMessages();
-  const messages = chatResponse?.data ?? [];
-  const unread = active === 'chat'
-    ? 0
-    : messages.filter((m) => parseTime(m.createdAt) > lastChatOpenedAt).length;
-
-  // Open/close BBB's native panel for a tab. Class is CSS-only (handled by the effect).
-  const openNative = (tab: Tab): void => {
-    if (tab === 'chat') {
-      pluginApi.uiCommands.chat.form.open();
-      setLastChatOpenedAt(Date.now());
-    } else if (tab === 'notes') {
-      clickNative(SHARED_NOTES_TOGGLE);
-    }
-  };
-  const closeNative = (tab: Tab): void => {
-    if (tab === 'chat') clickNative(CHAT_CLOSE_SELECTOR);
-    else if (tab === 'notes') clickNative(SHARED_NOTES_TOGGLE); // toggles off
-  };
-
-  const handleClick = (tab: Tab): void => {
-    setActive((cur) => {
-      if (cur === tab) { // clicking the active tab closes it
-        closeNative(tab);
-        return null;
-      }
-      if (cur) closeNative(cur); // switching tabs: close the previous panel
-      openNative(tab);
-      return tab;
-    });
-  };
-
-  return (
-    <div
-      style={{
-        position: 'fixed',
-        left: 0,
-        top: RAIL_TOP,
-        bottom: 0,
-        display: 'flex',
-        zIndex: 20,
-        fontFamily: FM.font,
-      }}
-    >
-      <style>{RAIL_LAYOUT_STYLE}</style>
-
-      <div
-        style={{
-          width: RAIL_WIDTH,
-          background: FM.gray100,
-          borderRight: `1px solid ${FM.line}`,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          gap: 6,
-          padding: '12px 0',
-        }}
-      >
-        {TABS.map((tab) => {
-          const isActive = active === tab;
-          return (
-            <button
-              key={tab}
-              type="button"
-              title={LABELS[tab]}
-              onClick={() => handleClick(tab)}
-              style={{
-                position: 'relative',
-                width: 56,
-                border: 0,
-                borderRadius: 12,
-                cursor: 'pointer',
-                padding: '8px 0 7px',
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: 4,
-                fontFamily: 'inherit',
-                background: isActive ? FM.coral : 'transparent',
-                color: isActive ? '#fff' : FM.ink2,
-                boxShadow: isActive ? '0 6px 14px -6px rgba(243,113,103,.6)' : 'none',
-              }}
-            >
-              {ICONS[tab]}
-              <span style={{ fontSize: 9, fontWeight: 700 }}>{LABELS[tab]}</span>
-              {tab === 'chat' && unread > 0 && (
-                <span
-                  style={{
-                    position: 'absolute',
-                    top: 4,
-                    right: 6,
-                    minWidth: 16,
-                    height: 16,
-                    borderRadius: 999,
-                    background: FM.coral,
-                    color: '#fff',
-                    fontSize: 9,
-                    fontWeight: 800,
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    padding: '0 4px',
-                    border: `2px solid ${FM.gray100}`,
-                  }}
-                >
-                  {unread}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </div>
-  );
+  // The plugin renders no UI and mutates no React DOM — it injects the nav reskin stylesheet below
+  // and links the global base reskin once (see ensureBaseCssLink). BBB owns the layout and keeps
+  // the whiteboard fixed, so switching is seamless and nothing can crash its React tree.
+  React.useEffect(() => { ensureBaseCssLink(); }, []);
+  return <style>{RESKIN_STYLE}</style>;
 }
 
 export function makeLessonHubWindow(pluginUuid: string): FloatingWindow {

@@ -67,6 +67,9 @@ module.exports = {
     new CopyWebpackPlugin({
       patterns: [
         { from: 'manifest.json', to: './' }, // Copy manifest.json to static/ in the output folder
+        // ensureBaseCssLink() loads this from the plugin's own origin, so prod (S3) must carry it
+        // too — dev serves it via the middleware above; without this the link 404s once deployed.
+        { from: 'fullmind-bbb-base.css', to: './' },
       ],
     }),
   ],
