@@ -1,69 +1,73 @@
 # Fullmind Classroom — plugin features
 
 Each feature is a self-contained file layered as a sibling in
-`../component-working.tsx`. The plugin draws its own fixed-position overlay
-(the Lesson Hub rail) rather than using BBB's native sidekick panels.
+`../component-working.tsx`. The Lesson Hub is a branded reskin of BBB's own
+native sidebar nav — it reuses BBB's chat, shared notes, and user list rather
+than rebuilding them. One chat, one notes panel, one user list: no duplicates.
 
 ## Registration (important)
 SDK `set*` methods are **last-writer-wins per plugin**. Two floating windows
-now coexist (the Session Progress bar + the Lesson Hub rail), so they must be
-registered together in ONE call. `register-floating-windows.tsx` is the single
+coexist (the Session Progress bar + the Lesson Hub), so they must be registered
+together in ONE call. `register-floating-windows.tsx` is the single
 `setFloatingWindows` caller — never call it from any other file.
 
 | Feature | File | Surface |
 |---|---|---|
-| Lesson Hub rail | `lesson-hub-rail.tsx` | `setFloatingWindows` (via hub) — fixed-position overlay: rail + sliding panel |
+| Lesson Hub | `lesson-hub-rail.tsx` | `setFloatingWindows` (via hub) — injects a pure-CSS reskin of BBB's native nav; no visible window of its own |
 | Session Progress bar | `../session-progress-bar.tsx` | `setFloatingWindows` (via hub) — fixed-position overlay |
-| Floating-windows hub | `register-floating-windows.tsx` | `setFloatingWindows` (ONE call: progress bar + rail) |
-| Chat panel body | `chat-panel.tsx` | `ChatPanelView` — reused inside the rail |
-| Notes panel body | `notes-panel.tsx` | `NotesPanelView` — reused inside the rail |
-| Class panel body | `class-panel.tsx` | `ClassPanelView` — reused inside the rail |
+| Floating-windows hub | `register-floating-windows.tsx` | `setFloatingWindows` (ONE call: progress bar + Lesson Hub) |
 | Font-size reorder | `font-size-reorder.tsx` | DOM only |
 | Shared tokens | `theme.ts` | — |
 
-## Architecture: one floating window, drawn as a fixed overlay
+## Architecture: pure-CSS reskin, no DOM mutation, no reflow
 
-`lesson-hub-rail.tsx` exports `makeLessonHubWindow(pluginUuid)`, which returns
-an invisible `FloatingWindow` (transparent, no shadow, `movable:false`). Its
-content renders `LessonHubView` — a `position:fixed` overlay that includes:
+`lesson-hub-rail.tsx` exports `makeLessonHubWindow(pluginUuid)`, which returns an
+invisible `FloatingWindow` (transparent, no shadow, `movable:false`). Its content
+renders `LessonHubView`, which **renders no UI and mutates no DOM** — it only:
 
-- **The rail** (64 px wide, light-gray, docked left below the nav bar): three
-  SVG icon buttons — Chat, Notes, Class.
-- **The sliding panel** (264 px wide): appears to the right of the rail when a
-  button is active; header + the reused `*PanelView` body.
-- **An injected `<style>`**: hides BBB's native sidebar and shrinks the stage
-  via `margin-left` when a panel is open (`body.fm-hub-open`).
+1. Injects `RESKIN_STYLE`, a `<style>` that restyles BBB's *own* native nav:
+   - relabels the tabs via `::after` ("Public Chat" → "Chat", "Shared Notes" →
+     "Notes"), hiding BBB's own text/icon with `display:none` on the child wrapper;
+   - draws the Fullmind outline icons via `::before` using a CSS `mask-image`
+     (so the icon inherits `currentColor` — grey normally, white on the coral
+     active tab);
+   - colours the active tab coral via BBB's own `aria-expanded="true"` (no JS
+     state tracking needed — BBB sets this on the open nav item);
+   - off-white→Gray-100 rail background (`var(--fm-gray-100, …)`) so the nav
+     reads as a distinct column from the white panel beside it;
+   - hover greys for the Chat/Notes tabs and user rows.
+2. Calls `ensureBaseCssLink()` once (in a `useEffect`): appends a single
+   `<link id="fm-base-css">` to `<head>` pointing at `fullmind-bbb-base.css`,
+   whose URL is **derived from the plugin's own `<script src>` origin** (tunnel
+   in dev, S3 in prod) and carries the script's `?version=` for cache-busting.
+   This loads the global base reskin (plum bars, logo, fonts) reliably across
+   reloads — `userdata-bbb_custom_style_url` is ignored on bbb0-v3, and a
+   hand-injected link is wiped on every page reload.
 
-The component owns all open/close + active-tab state internally. Clicking an
-active button closes the panel; clicking another switches tabs.
+**Why pure CSS:** an earlier version rewrote the nav items' `innerHTML` and ran
+a `MutationObserver`; that fought BBB's React reconciliation and crashed the
+client ("Oops, something went wrong"). And an earlier *rail* reflowed BBB's
+columns (`margin-left`), which made the whiteboard pop on every panel switch.
+This version moves nothing and mutates no React-owned node — BBB owns the
+layout, so chat↔notes is seamless exactly like a default room. Appending one
+`<link>` to `<head>` is safe (it never touches BBB's React tree).
 
-## Live-wire constants (confirm in the test room)
-
-Four constants are labeled `// CONFIRM IN LIVE ROOM` and must be tuned once
-in a live BBB room before shipping:
-
-| Constant | File | What it selects / controls |
-|---|---|---|
-| `NOTES_PAD_URL` | `notes-panel.tsx` | Etherpad pad URL embedded in the Notes panel. Empty string by default — the panel shows fallback text until set. |
-| `NATIVE_SIDEBAR_SELECTOR` | `lesson-hub-rail.tsx` | CSS selector for BBB's native sidebar column to hide (preferred: `data-test` attribute). |
-| `STAGE_SELECTOR` | `lesson-hub-rail.tsx` | CSS selector for the presentation/stage container that gets pushed narrower when a panel opens. |
-| `RAIL_TOP` | `lesson-hub-rail.tsx` | Pixel offset from the top of the viewport so the rail sits below BBB's nav bar. |
-
-## Chat unread badge
-
-The Chat rail button shows a live coral badge counting messages received since
-Chat was last opened (`useLoadedChatMessages` feed). The count resets to 0
-when the Chat panel opens. Notes and Class have no badge (no meaningful unread
-signal available from the SDK).
+### Known fragility
+The reskin selectors hang on BBB's `data-test` hooks and `aria-expanded` — these
+are test/accessibility attributes, not a stable theming API. A BBB 3.x upgrade
+can rename or drop them, and the reskin would silently revert with no error.
+**Re-verify the selectors in a live room on every BBB upgrade.** (No hashed
+styled-component class names are relied on, which is the more brittle option.)
 
 ## Build & deploy
 
 ```bash
-npm run build-bundle   # → dist/FullmindClassroom.js + dist/manifest.json
+npm run build-bundle   # → dist/FullmindClassroom.js + dist/manifest.json + dist/fullmind-bbb-base.css
 ```
 
-Manifest is at `0.0.4`. Upload both `dist/` files to the S3 folder per
-`DEV-HANDOFF.md`.
+Manifest is at `0.0.6`. Upload all **three** `dist/` files to the S3 folder per
+`DEV-HANDOFF.md` — the base CSS must be co-located with the bundle so
+`ensureBaseCssLink()` can load it from the same origin.
 
 ## Local preview
 
@@ -71,20 +75,20 @@ Manifest is at `0.0.4`. Upload both `dist/` files to the S3 folder per
 npm run preview        # → http://localhost:4702
 ```
 
-Renders the real `LessonHubView` against the mock SDK. The rail is
-interactive: click a button to open its panel.
+⚠️ `LessonHubView` now renders only a `<style>` that targets BBB's native nav,
+which does not exist in the mock preview DOM — so the preview shows nothing
+useful for this feature. Verify the reskin live on BBB (tunnel, or Stylus over a
+real room), not in the local preview.
 
 ## Live-verification checklist (test room)
 
-- Rail sits below the top nav, left edge, three correct SVG buttons visible.
-- Clicking Chat opens the Chat panel and pushes the whiteboard narrower; the
-  native sidebar is hidden (no duplicate chat/users column).
-- Clicking Notes opens the Notes panel (set `NOTES_PAD_URL` first; otherwise
-  fallback text shows). Clicking the active button closes the panel and the
-  whiteboard restores its width.
-- Clicking Class opens the class roster; talking dot and MUTED labels reflect
-  live audio state.
-- Chat badge increments while Chat is closed and new messages arrive; clears to
-  0 on open.
+- Nav tabs read "Chat" and "Notes" with the Fullmind outline icons; no double
+  labels, no grey gradient boxes.
+- The open tab is coral with white label + icon (driven by `aria-expanded`).
+- The nav rail background is Gray-100, distinct from the white panel beside it.
+- Switching Chat↔Notes is seamless — the whiteboard does NOT pop or rescale.
+- Hovering a Chat/Notes tab or a user row shows the light-grey hover.
+- The base reskin loaded on its own after a reload (plum bars + logo present,
+  with no manual CSS injection) — confirms `ensureBaseCssLink()` fired.
 - Settings → Application: the "%" value sits between the - and + buttons
   (font-size reorder, unchanged).
