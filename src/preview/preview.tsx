@@ -13,6 +13,7 @@ import * as React from 'react';
 import { createRoot } from 'react-dom/client';
 
 import { LessonHubView } from '../fullmind-classroom/features/lesson-hub-rail';
+import { SessionProgressView } from '../fullmind-classroom/session-progress-bar';
 
 // A stable, arbitrary UUID for the preview — the mock-sdk ignores it anyway.
 const PREVIEW_UUID = 'preview-00000000-0000-0000-0000-000000000000';
@@ -27,10 +28,13 @@ function App() {
       background: '#F0F3F6',
       position: 'relative',
     }}>
-      {/* Page caption — sits in the top-right so the rail can occupy the left */}
+      {/* The real Session Progress band — position:fixed; spans the top edge */}
+      <SessionProgressView pluginUuid={PREVIEW_UUID} />
+
+      {/* Page caption — sits in the top-right, below the band, so the rail owns the left */}
       <div style={{
         position: 'fixed',
-        top: 12,
+        top: 44,
         right: 20,
         fontFamily: '"Plus Jakarta Sans", system-ui, -apple-system, sans-serif',
         textAlign: 'right',

@@ -351,16 +351,59 @@ li, label, th, td {
    each recompute. Bar heights are stable; exposed as vars so the sidebar reflow
    math has ONE place to tune if a BBB upgrade changes them. */
 :root {
+  --fm-band-h:       32px;  /* Session Progress band height — SHARED CONTRACT with the
+                               plugin (session-progress-bar.tsx reads this same var for
+                               the band's height). Prototype `.room` grid row 1 = 32px. */
   --fm-navbar-h:     85px;  /* #Navbar height     (live 6/3) */
   --fm-actionsbar-h: 64px;  /* #ActionsBar height — measured 64.4px live 6/3 (was 70px, which left a ~5.6px dark gap above the bar). Slight under-value so panels overlap the bar's top rather than gap. ⚠️ BBB scales bar height with window size, so a big resize can reopen a hairline gap — plugin territory long-term. */
 }
 
+/* ── SESSION PROGRESS band — reserve the top strip (per-element push) ──────────────
+   The Session Progress bar plugin renders a full-width band pinned to the very top
+   (position:fixed; top:0; height:var(--fm-band-h)). To keep BBB's room clear of it we
+   push the navbar + stage + sidebar DOWN by --fm-band-h. ONE shared number drives both
+   this reservation and the plugin's rendered band height (see the band-design spec).
+
+   WHY PER-ELEMENT (not a single #layout push): proved live 2026-06-05 (console) that
+   #layout is position:static — so `top` on it is ignored — and every region's
+   offsetParent is <body>, not #layout, so moving #layout cannot move them. Each region
+   is instead absolutely positioned relative to <body> with a BBB-computed inline `top`.
+   We override those with !important (which beats BBB's inline px and keeps winning on
+   recompute — same mechanism §B3 uses for the sidebar).
+
+   WHY NOT lean on BBB's native session-timer banner: it occupies this same top strip
+   and pushes the navbar down WHEN PRESENT (measured: navbar top=34 with banner, =0
+   without), but it is intermittent — so the band would overlap the navbar whenever the
+   banner is dismissed. Forcing the geometry below makes the reservation deterministic,
+   banner or no banner; §B3 already makes that banner transparent, so the opaque band
+   simply renders over it.
+   ⚠️ LIVE-VERIFY: confirm the navbar/leave/connection clear the band AND the whiteboard
+   still fits (overriding presentationContainer's measured geometry makes BBB RE-FIT the
+   whole presentation into the new box — README "feed BBB a smaller bound"; clean
+   top/height resize, NOT a padding/inset clip). If a gap reopens on resize, the calc
+   below (in --fm-* vars) is the one knob. */
+
 /* Top navigation bar (navy → Plum) — ✅ CONFIRMED live 6/1: <header id="Navbar">.
-   Stretched edge-to-edge 6/3 (was left:582, right column only). */
+   Stretched edge-to-edge 6/3 (was left:582, right column only). `top` drops it below
+   the reserved band (2026-06-05); height stays BBB's. */
 #Navbar {
   background-color: var(--fm-plum);
   left: 0 !important;
   width: 100% !important;
+  top: var(--fm-band-h) !important;
+}
+
+/* Stage → start below band+navbar, fill down to the actions bar. This is the region
+   BBB MEASURES to fit the slide, so overriding its top/height makes BBB re-fit the
+   whole presentation into the box (README "feed BBB a smaller bound") — the
+   deterministic reservation for the stage, NOT a clip.
+   NOTE: #cameraDock (webcam panel) is intentionally NOT pushed here — it's unverified
+   (no cameras in the test room) and may nest inside the stage rather than sit beside
+   it, so forcing its geometry could break webcam layout. Re-check with a camera on; if
+   the dock rides under the band, add it to this rule. */
+[data-test="presentationContainer"] {
+  top: calc(var(--fm-band-h) + var(--fm-navbar-h)) !important;
+  height: calc(100% - var(--fm-band-h) - var(--fm-navbar-h) - var(--fm-actionsbar-h)) !important;
 }
 
 /* Bottom action bar (navy → Plum). Stretched edge-to-edge 6/3.
@@ -390,8 +433,8 @@ section[aria-label="Actions bar"] {
    ⚠️ Structural (the wrappers are unnamed) — re-verify after any BBB html5-client
    upgrade. If the chat composer/input gets clipped, the height calc is the knob. */
 #layout > div:not([data-test]) {
-  top: var(--fm-navbar-h) !important;
-  height: calc(100% - var(--fm-navbar-h) - var(--fm-actionsbar-h)) !important;
+  top: calc(var(--fm-band-h) + var(--fm-navbar-h)) !important;
+  height: calc(100% - var(--fm-band-h) - var(--fm-navbar-h) - var(--fm-actionsbar-h)) !important;
 }
 
 /* Session-time-remaining banner → TRANSPARENT — ✅ CONFIRMED live 6/1. */

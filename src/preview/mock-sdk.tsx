@@ -36,11 +36,21 @@ const MOCK_VOICES: Array<{
 // ---------------------------------------------------------------------------
 // Mock API object returned by getPluginApi()
 // ---------------------------------------------------------------------------
+// Preview-only session timing for the Session Progress band. NOT fake "content" like
+// names/messages — it's the meeting clock the band needs to render at all. Tuned so the
+// preview shows a representative ~33% fill + "40:00 left" (a 60-min session, 20 min in),
+// matching the band-design spec's example. createdTime is computed once at module load.
+const MOCK_SESSION_START = Date.now() - 20 * 60 * 1000; // 20 min ago
+const MOCK_SESSION_TIMING = {
+  data: { meeting: [{ createdTime: MOCK_SESSION_START, durationInSeconds: 60 * 60 }] },
+};
+
 function makeMockApi(): PluginApi {
   return {
     useLoadedChatMessages: () => ({ data: MOCK_MESSAGES }),
     useLoadedUserList:     () => ({ data: MOCK_USERS }),
     useTalkingIndicator:   () => ({ data: MOCK_VOICES }),
+    useCustomSubscription: () => MOCK_SESSION_TIMING,
 
     serverCommands: {
       chat: {
