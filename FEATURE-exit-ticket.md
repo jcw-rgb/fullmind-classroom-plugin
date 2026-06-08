@@ -16,8 +16,11 @@ handling, modal UI, testing, build order, and references. Read that, not this fi
 - **Answer types (v1):** all four — single-choice, multiple-choice, text, file upload.
 - **Star rating:** included.
 - **Teacher in-room view:** live submission count ("5 of 8").
-- **Trust model:** signed submit-token delivered via the SDK's `remoteDataSources`
-  (a plugin **cannot** read join `userdata-*`, so the token is fetched, not injected).
+- **Route-in:** the question is pulled in via the SDK's `remoteDataSources`
+  (meeting-level, server-fetched — confirmed; a plugin cannot read per-user join data).
+- **Submit trust model (Path 2):** plugin → BBB data channel → **vidapi** harvester →
+  LMS server-to-server. BBB vouches each sender's identity, so no impersonation and no
+  browser→LMS calls (hence no CORS, no per-user token).
 - **Spans three codebases:** plugin + `v2_lms` backend + vidapi. Build order:
   backend → vidapi → plugin plumbing → plugin UI (modal last).
 

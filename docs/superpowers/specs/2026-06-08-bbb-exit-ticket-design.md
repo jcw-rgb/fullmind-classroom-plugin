@@ -18,8 +18,7 @@ BBB room**, with answers returning to the LMS.
 3. **Return.** Student answers flow **back to the LMS**, landing on the same
    per-session record the educator already reviews.
 
-Students never leave the room. (This replaces the earlier "redirect out to the
-LMS" idea — there is no standalone exit-ticket URL anyway.)
+Students never leave the room.
 
 ## Decisions (locked)
 
@@ -28,201 +27,218 @@ LMS" idea — there is no standalone exit-ticket URL anyway.)
 | Answer types (v1) | **All four**: single-choice, multiple-choice, open text, file upload |
 | Star rating | **Included** (student rates educator 1–5, returned to LMS) |
 | Teacher in-room view | **Live submission count** ("5 of 8 submitted") |
-| Trust model | **Approach A** — short-lived signed submit-token, delivered via the SDK's `remoteDataSources` |
+| Route-in mechanism | SDK **`remoteDataSources`** (meeting-level, server-fetched — confirmed) |
+| Submit trust model | **Path 2 — server-relay**: plugin → BBB data channel → **vidapi** harvester → LMS (server-to-server). BBB vouches each sender's identity, so no impersonation. |
 | Authoring | LMS only (educator, per session); the plugin fetches, never authors |
 | Summon mechanism | Data channel broadcast (moderator → all clients) |
+| Implementer | Us, all four subsystems |
+
+## Spike result (2026-06-08) — why the trust model is server-relay
+
+`reference/bbb-plugins-docs.txt` (lines 796–798) confirms `remoteDataSources` is
+fetched by **BBB's plugin-server, server-side, at the meeting level** (one URL per
+meeting via `meta_*`, cached on create or re-proxied on demand; `permissions` only
+gates roles). It therefore **can deliver the question** (same for all students) but
+**cannot deliver a per-student token** (the fetch carries no per-user identity).
+
+So the browser cannot be handed an unforgeable per-student credential. The secure
+path is to **not let the browser talk to the LMS at all**: the student's plugin
+pushes its answer onto the BBB **data channel** (where BBB stamps the verified
+`fromUserId`), and **our vidapi reads those entries and forwards them to the LMS
+server-to-server**. No browser→LMS calls anywhere → **no CORS change, no per-user
+token util needed.**
 
 ## Background — how exit tickets ("EOS") work in the LMS today
 
-"Exit ticket" = **EOS (End Of Session)** in code. It is a `:question` attached to
-a `:session`, plus `:student_response` entities, plus an optional `:rating`.
+"Exit ticket" = **EOS (End Of Session)** in code: a `:question` attached to a
+`:session`, plus `:student_response` entities, plus an optional `:rating`.
 
 - **Authored by the educator, per session**, in the LMS (`ManageSession`):
   `POST /api/v2/eos/question/session/{sessionId}`.
-- **Four answer types:** `s` single-choice, `m` multiple-choice, `t` text,
-  `f` file. Choice types **auto-score on submit** (`end_of_session/scoring.clj`);
-  text/file are educator-graded.
-- **Students take it as a dashboard MODAL today** (cookie-triggered after class) —
-  there is **no `/exit-ticket/:id` URL and no token**. Identified by
-  **(sessionId, studentId)**.
+- **Four answer types:** `s` single-choice, `m` multiple-choice, `t` text, `f` file.
+  Choice types **auto-score on submit** (`end_of_session/scoring.clj`); text/file are
+  educator-graded.
+- **Students take it as a dashboard MODAL today** (cookie-triggered after class) — no
+  `/exit-ticket/:id` URL, no token. Identified by **(sessionId, studentId)**.
 - **Submit:** `POST /api/v2/eos/student_response/session/{sessionId}/student/{studentId}`.
-- **After submit:** stored in Datomic; auto-scored for choice; denormalized onto
-  the session doc in ElasticSearch (`eosData`); surfaced in the **Exit Ticket
-  Reports** dashboard (`/exit-ticket-reports`, by educator/student/school) and the
-  per-session grading table (`EosTable`); score/reminder emails via SendGrid.
-  **Nothing leaves the LMS** (no Salesforce, no warehouse, no billing gating, no
-  export, no auto-deletion). **No parent-facing view.**
+- **After submit:** stored in Datomic; auto-scored for choice; denormalized onto the
+  session doc in ElasticSearch (`eosData`); surfaced in the **Exit Ticket Reports**
+  dashboard (`/exit-ticket-reports`) and the per-session grading table (`EosTable`);
+  score/reminder emails via SendGrid. Nothing leaves the LMS. No parent-facing view.
 
 ## Architecture (three codebases)
 
 ```
-┌─────────────────┐  meta_* = LMS bootstrap URL   ┌──────────────────┐
-│  vidapi          │ ────────────────────────────▶ │  BBB room +       │
-│ (room creator,   │  (set at create; we control)  │  Fullmind plugin  │
-│  we control it)  │                                └────────┬─────────┘
-└─────────────────┘                                          │ getRemoteData → question + token
-                                                             │ POST answers/rating (+ token)
-                                                             ▼
+            meta_* = LMS question URL (set at create; server-side fetch)
+┌─────────────────┐ ───────────────────────────────▶ ┌──────────────────┐
+│  vidapi          │                                   │  BBB room +       │
+│ (room creator    │ ◀── reads data-channel entries ── │  Fullmind plugin  │
+│  + harvester;    │     (BBB stamps verified sender)  └────────┬─────────┘
+│  WE CONTROL IT)  │                                            │ getRemoteData → question
+│                  │ ── forwards answers (server↔server) ──┐    │ pushEntry(answer) → data channel
+└─────────────────┘                                       │    │
+                                                           ▼    ▼
 ┌────────────────────────────────────────────────────────────────────┐
-│  v2_lms backend — new bootstrap + submit endpoints (token-verified)   │
-│  reuse existing create-student-response → same reports/grading        │
+│  v2_lms backend                                                       │
+│   • question-source endpoint (returns published question; called      │
+│     server-side by BBB's plugin-server via remoteDataSources)         │
+│   • submit endpoint (called by vidapi, server-to-server): resolve BBB  │
+│     uuids → LMS ids, REUSE create-student-response → same reports      │
 └────────────────────────────────────────────────────────────────────┘
 ```
 
-### Delivery mechanism (verified against `reference/bbb-plugins-docs.txt`)
-
-- A plugin **cannot** read custom `userdata-*` join parameters — there is no SDK
-  hook for it. So "inject a pass into the join, plugin reads it" is **not viable.**
-- BBB's documented mechanism is **`remoteDataSources`**: the plugin manifest
-  declares a data source whose URL is templated from a `meta_*` create param; the
-  plugin calls `pluginApi.getRemoteData(name)` and BBB fetches that LMS URL. This
-  is the channel for the bootstrap fetch (question + token).
-- Broadcast to all clients uses **`useDataChannel`** (moderator `pushPermission`);
-  the SDK can't inject UI on a remote client, so we broadcast a state flag and each
-  client opens its **own** FloatingWindow in response.
+**The browser only ever talks to BBB.** Route-in and submit both cross to the LMS
+server-side. This is what makes Path 2 secure.
 
 ## Data flow (click-by-click)
 
-**Setup:** educator authors the ticket in the LMS (published); room is created with
-`meta_*` pointing the plugin's remote-data-source at the LMS bootstrap endpoint.
+**Setup:** educator authors the ticket in the LMS (published); room created with a
+`meta_*` pointing the plugin's `remoteDataSources` at the LMS question endpoint.
 
-**Route-in:** plugin loads → `getRemoteData('exitTicket')` → LMS returns the
-**question** (text, type, choices, rating-requested?) + a **signed submit-token**
-scoped to (this student, this session).
+**Route-in:** plugin calls `getRemoteData('exitTicket')` → BBB's plugin-server fetches
+the LMS question endpoint and proxies back the **question** (text, type, choices,
+rating-requested?) + the **sessionId** for the room.
 
 **Summon:** educator opens ⊕ Actions → **Start Exit Ticket** → plugin (moderator)
 `pushEntry('open')` on the data channel → every student client opens its own modal.
 
-**Complete & return:** student answers (choice/text/file) + stars → Submit → plugin
-POSTs to the LMS submit endpoint with the token → LMS verifies token, resolves
-session+student, **reuses `create-student-response`** → lands in today's
-reports/grading. Plugin then `pushEntry('submitted')` (count signal only).
+**Complete & return:** student answers (choice/text + stars) → Submit → plugin
+`pushEntry(answer)` on a dedicated answers sub-channel (BBB stamps the verified
+`fromUserId` = student role uuid). **vidapi reads** that entry and **POSTs it to the
+LMS submit endpoint** (server-to-server). LMS resolves uuids → (sessionId, studentId)
+via existing `get-attendence-by-uuids`/`by-uuid` and **reuses `create-student-response`**
+(+ rating) → lands in today's reports/grading. Plugin also `pushEntry('submitted')`
+(count signal).
 
 **Count & close:** teacher panel tallies "submitted" pings vs roster → "N of M".
 Teacher clicks Close → `pushEntry('close')` → all student modals dismiss.
+
+**File upload (type `f`) — separate path, sequenced last:** the data channel can't
+carry a binary blob. The question endpoint returns a **pre-signed S3 PUT URL** (scoped
+to the meeting's upload folder); the browser uploads the file directly to S3 via that
+signed URL (no LMS auth needed — the signature authorizes it), then the file
+*reference* rides the data channel like any other answer. (Mini-design TBD in the
+file-upload phase.)
 
 ## Components to build
 
 ### BBB plugin (`fullmind-classroom-plugin`)
 | File | Job |
 |---|---|
-| `src/fullmind-classroom/exit-ticket.tsx` (from `deferred/.wip`) | ⊕-menu item (moderator-only) + open/close broadcast + watcher + `getRemoteData` bootstrap |
-| `src/fullmind-classroom/exit-ticket-modal.tsx` | Student modal (FloatingWindow-as-modal): renders by type + star rating; Submit → LMS; submitted state |
-| `src/fullmind-classroom/exit-ticket-teacher-panel.tsx` | Live "N of M submitted" count |
-| `src/fullmind-classroom/lms-client.ts` | fetch wrapper: fetch question, submit answer/rating, upload file |
-| `manifest.json` | add `dataChannels` + `remoteDataSources` entries; bump version |
+| `src/fullmind-classroom/exit-ticket.tsx` (from `deferred/.wip`) | ⊕-menu item (moderator-only) + open/close broadcast + watcher + `getRemoteData` route-in |
+| `src/fullmind-classroom/exit-ticket-modal.tsx` | Student modal (FloatingWindow-as-modal): renders by type + star rating; Submit → `pushEntry(answer)`; submitted state |
+| `src/fullmind-classroom/exit-ticket-teacher-panel.tsx` | Live "N of M submitted" count (watches "submitted" pings) |
+| `manifest.json` | add `dataChannels` (open/close/answer/submitted) + `remoteDataSources` (question) entries; bump version |
 | `register-floating-windows.tsx` | register modal + teacher panel (single `setFloatingWindows` caller) |
+
+(No browser LMS-client module — the plugin never calls the LMS directly.)
 
 ### v2_lms backend (Clojure)
 | Component | Job |
 |---|---|
-| Bootstrap endpoint (`remoteDataSource` target) | Return session's published question + signed short-lived submit-token scoped to (student, session) |
-| Submit endpoint (token + uuids) | Verify token; resolve BBB uuids → LMS ids via existing `get-attendence-by-uuids`/`by-uuid`; **reuse `create-student-response`** (+ rating + file) |
-| CORS | Add BBB room origin to allowlist (`cors-extra-origins`) |
-| Token sign/verify util | New shared-secret signer |
+| Question-source endpoint | Returns the session's published question for a meeting (called server-side by BBB's plugin-server via `remoteDataSources`); identifies the session from the meeting uuid carried in the `meta_*` URL |
+| Submit endpoint (server-to-server, called by vidapi) | Resolve BBB uuids → LMS ids via existing `get-attendence-by-uuids`/`by-uuid`; **reuse `create-student-response`** (+ rating); optionally gated by a shared secret |
+| (No CORS change, no per-user token util needed) | — |
 
-### vidapi (room creator)
+### vidapi (room creator + harvester) — WE CONTROL IT
 | Component | Job |
 |---|---|
-| Create call | Set `meta_*` → LMS bootstrap URL, carrying a meeting-scoped signed value so the LMS trusts the request |
+| Create call | Set `meta_*` → LMS question endpoint URL (carrying the meeting/session reference) |
+| **Answers harvester** | Read the plugin's answer data-channel entries for the meeting (BBB stamps the verified `fromUserId`) and forward each to the LMS submit endpoint server-to-server |
 
-**Reuse (manager rule #1):** backend reuses existing answer-recording + auto-scoring
-(choices score server-side exactly as today); the plugin modal mirrors the LMS
-`EosAnswerForm` behavior (types `s/m/t/f`, validation, lock-after-scored). We add an
-*entry path*, not a parallel system.
+**Reuse (manager rule #1):** backend reuses existing answer-recording + auto-scoring;
+plugin modal mirrors the LMS `EosAnswerForm` behavior (`s/m/t/f`, validation,
+lock-after-scored). We add an *entry path*, not a parallel system.
 
-## Security / trust model
+## Security / trust model (Path 2)
 
-The LMS today trusts BBB webhooks because they're **server-to-server on a private
-network**; a student's browser is **not** trusted that way. So:
-
-- The bootstrap fetch (via `remoteDataSources`) returns a **short-lived, signed
-  submit-token** scoped to (student, session). The plugin includes it on submit;
-  the LMS verifies the signature → can't be forged, expires after class.
-- The bootstrap endpoint's own request legitimacy is established by a
-  **meeting-scoped signed value** carried in the `meta_*` URL (only the LMS could
-  mint it at room create).
-- **OPEN ITEM (backend to finalize):** exactly how the bootstrap endpoint confirms
-  *which user* is asking on that initial fetch (does BBB pass the user identity on a
-  `remoteDataSource` fetch, or does the token need to be per-meeting + the submit
-  carry the BBB user uuid for server-side resolution?). The mechanism is supported;
-  the precise per-user binding is a backend detail to confirm early.
-- We do **not** ship the "open mailbox" variant (unauthenticated browser-reachable
-  write endpoints) — that's only safe for the existing private server-to-server
-  webhooks, not for browser submissions of student data / educator ratings.
+- **No browser→LMS calls.** Route-in is a server-side `remoteDataSources` fetch; submit
+  is browser→data channel→vidapi→LMS. The browser only ever talks to BBB.
+- **Identity is vouched by BBB:** each data-channel entry carries a `fromUserId` that
+  BBB sets (the student joined via a signed join URL minted by the LMS for *that*
+  student). vidapi trusts it; a student cannot forge a classmate's `fromUserId`.
+- **vidapi→LMS** runs server-to-server (private), following the existing webhook trust
+  model; optionally hardened with a shared secret (net-new, small).
+- **Route-in URL secrecy:** the `meta_*` question URL is injected server-side at create
+  and never exposed to the browser; can carry a meeting-scoped signed value so the LMS
+  trusts the plugin-server fetch.
 
 ## Error handling & edge cases
 
-- **No ticket authored when teacher clicks Start:** bootstrap reports none → teacher
-  sees "No exit ticket is set up for this session — create one in the LMS first";
-  nothing broadcasts.
+- **No ticket authored when teacher clicks Start:** route-in reports none → teacher sees
+  "No exit ticket is set up for this session — create one in the LMS first"; nothing broadcasts.
 - **Student joins late:** data channel replays latest "open" state → modal opens on join.
-- **Already answered (refresh/rejoin):** show submitted state, don't re-prompt
-  (existing handler upserts, so a duplicate is safe).
-- **Submit fails / token expired:** retry w/ backoff; re-fetch token; final fallback
-  is the **existing LMS dashboard modal** (question is published, normal post-class
-  flow still catches them).
-- **LMS unreachable / CORS misconfig:** bootstrap fails → "exit ticket unavailable";
+- **Already answered (refresh/rejoin):** show submitted state, don't re-prompt (existing
+  handler upserts, so duplicates are safe; vidapi can also de-dupe per `fromUserId`).
+- **vidapi→LMS submit fails:** retry w/ backoff from vidapi; final fallback is the
+  **existing LMS dashboard modal** (question is published, normal post-class flow catches them).
+- **LMS unreachable at route-in:** `getRemoteData` fails → "exit ticket unavailable";
   nothing broadcasts (fail safe).
-- **File upload errors:** client-side size/type validation + retry; same S3 path as LMS.
+- **File upload errors:** client-side size/type validation + retry; pre-signed S3 PUT.
 - **Roles:** students get the modal; teacher gets the count panel — role-gated.
 - **Double-click / multiple moderators:** "open" is idempotent channel state.
 
 ## Modal UI
 
-No full mockup ever existed (only the ⊕-menu item was prototyped), so we build from
-the verified Fullmind design system, consistent with the reskin:
+No mockup ever existed (only the ⊕-menu item was prototyped), so we build from the
+verified Fullmind design system, consistent with the reskin:
 
 - **Shell:** `FloatingWindow` styled as a modal — centered, `movable:false`, scrim
   `rgba(33,37,41,.55)`, card radius **14px**, off-white/white surface, **plum**
   (`#403770`) header, **Plus Jakarta Sans**.
-- **Structure:** Header (plum: "Exit Ticket" + topic) → Body (question + answer UI)
-  → star-rating row → Footer (**coral** `#F37167` Submit, gray Cancel).
+- **Structure:** Header (plum: "Exit Ticket" + topic) → Body (question + answer UI) →
+  star-rating row → Footer (**coral** `#F37167` Submit, gray Cancel).
 - **Answer types:** choice = rounded 14px answer tiles (gamified-quiz pattern,
-  per-option hue, selected = coral border + check); text = composer-style input
-  (focus coral); file = upload control → S3; rating = 1–5 stars.
+  per-option hue, selected = coral border + check); text = composer-style input (focus
+  coral); file = upload control → pre-signed S3; rating = 1–5 stars.
 - Loop in AD for a mockup review before/after first build.
 
 ## Testing
 
-- **Plugin:** unit-test open/close channel logic, bootstrap parsing, per-type
-  rendering, submit-payload building (mock SDK per repo convention); manual live
+- **Plugin:** unit-test open/close channel logic, route-in parsing, per-type rendering,
+  answer `pushEntry` payload building (mock SDK per repo convention); manual live
   verification in a test room (`docs/TESTING-A-ROOM.md`).
-- **Backend (Opus review):** bootstrap (returns question + token; rejects bad room
-  signature), token verify, uuid→id resolution, submit reusing
-  `create-student-response`, CORS. Data-shape audit on `s/m/t/f` codes vs fixtures.
-- **vidapi:** verify `meta_*` set on create.
-- **End-to-end (Opus):** Start → modal → submit → appears in LMS reports/grading,
-  verified in a real room (kill/restart/wipe cache; Justin does visual sign-off).
+- **Backend (Opus review):** question-source endpoint (returns published question;
+  resolves session from meeting uuid), submit endpoint (uuid→id resolution, reuse
+  `create-student-response`, optional shared-secret gate). Data-shape audit on `s/m/t/f`
+  codes vs fixtures.
+- **vidapi (Opus review):** `meta_*` set on create; harvester reads data-channel entries
+  and forwards correctly; de-dupe + retry.
+- **End-to-end (Opus):** Start → modal → submit → appears in LMS reports/grading, verified
+  in a real room (kill/restart/wipe cache; Justin does visual sign-off).
 
 ## Build order (sequence the work)
 
-1. **Backend (v2_lms):** bootstrap + submit endpoints, token util, CORS. *(Opus.)*
-2. **vidapi:** set the `meta_*` bootstrap URL on create.
-3. **Plugin plumbing:** `remoteDataSources` fetch + data-channel open/close + submit wiring.
-4. **Plugin UI (last):** the modal + teacher count panel + file upload.
+1. **Backend (v2_lms):** question-source endpoint + submit endpoint (+ optional secret). *(Opus.)*
+2. **vidapi:** set `meta_*` question URL on create + build the answers harvester. *(Opus.)*
+3. **Plugin plumbing:** `remoteDataSources` route-in + data-channel open/close/answer/submitted wiring.
+4. **Plugin UI:** modal + teacher count panel — **file upload last** (needs the pre-signed-S3 mini-design).
 
-The in-room prompt is last; it can't be meaningfully built before the route-in,
-broadcast, and return path exist.
+The in-room prompt is last; it can't be meaningfully built before route-in, broadcast,
+and the return path exist.
 
 ## Open items / risks
 
-- **Per-user binding on the bootstrap fetch** (security open item above) — confirm first.
-- **`remoteDataSources` fetch semantics** — confirm whether BBB passes user identity
-  and `fetchMode` (`onMeetingCreate` cache vs `onDemand` fresh) behavior in a live room.
-- **File upload from inside BBB** — heaviest piece; may sequence last even within v1.
-- **Cross-repo coordination** — backend + vidapi changes need the owning team's
-  review; plugin + backend land as separate PRs (merge one at a time).
+- **vidapi reading BBB data-channel entries** — confirm the mechanism early (likely
+  querying BBB's GraphQL `pluginDataChannelEntry` with an internal token; vidapi already
+  talks to BBB but this is a new API surface). This gates the harvester.
+- **File upload under Path 2** — needs the pre-signed-S3 sub-design; heaviest piece,
+  sequenced last even within v1.
+- **Answers transiting the data channel** — restrict the answer sub-channel's read
+  permission so other students can't read peers' answers; keep payloads minimal.
+- **Cross-repo coordination** — backend + vidapi + plugin land as separate PRs (merge one
+  at a time); backend/vidapi want Opus review.
 
 ## Key references (from research)
 
 - Plugin SDK: `node_modules/bigbluebutton-html-plugin-sdk/dist/cjs/data-channel/types.d.ts`
-  (`useDataChannel`, `pushEntry`); `reference/bbb-plugins-docs.txt` (`remoteDataSources`
-  ~lines 779–815; hooks ~489–500).
-- BBB API: `reference/bbb-api-docs.txt` (`userdata-*` 1538–1540; `meta_*` create 335–341).
+  (`useDataChannel`, `pushEntry`, `fromUserId`); `reference/bbb-plugins-docs.txt`
+  (`remoteDataSources` 779–815, spike-confirmed server-side/meeting-level at 796–798;
+  hooks 489–500).
+- BBB API: `reference/bbb-api-docs.txt` (`meta_*` create 335–341; `userdata-*` 1538–1540).
 - LMS EOS: `v2_lms` `end_of_session/{routes,handler,scoring}.clj`,
-  `sessions/{query,webhook_handler}.clj` (`get-attendence-by-uuids`), `middle.clj`
-  (CORS), `sessions/model.clj` (`generate-wb-link-from-session`: meeting=`:ent/uuid`,
-  attendee=student role `:ent/uuid`); frontend `v2_lms_react/src/components/forms/eos/`.
+  `sessions/{query,webhook_handler}.clj` (`get-attendence-by-uuids`), `sessions/model.clj`
+  (`generate-wb-link-from-session`: meeting=`:ent/uuid`, attendee=student role `:ent/uuid`);
+  frontend `v2_lms_react/src/components/forms/eos/`.
 - Plugin scaffolding: `deferred/exit-ticket.tsx.wip` (⊕-menu item built);
   `src/fullmind-classroom/session-progress-bar.tsx` (FloatingWindow template).
