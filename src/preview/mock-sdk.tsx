@@ -3,7 +3,7 @@
  * Stand-in for 'bigbluebutton-html-plugin-sdk' used only by the local preview build.
  * Aliased via webpack.preview.js → resolve.alias so the real SDK is never touched.
  *
- * Exports every name that chat-panel.tsx, class-panel.tsx, and notes-panel.tsx import.
+ * Exports every name the LessonHub rail + session progress bar import.
  */
 
 // ---------------------------------------------------------------------------
@@ -60,7 +60,16 @@ function makeMockApi(): PluginApi {
       },
     },
 
+    // Returns the provided default — preview has no live native panel state.
+    useUiData: (_name: string, defaultValue: unknown) => defaultValue,
+
     uiCommands: {
+      chat: {
+        form: {
+          open: () => console.log('[mock-sdk] uiCommands.chat.form.open'),
+          fill: (args: unknown) => console.log('[mock-sdk] uiCommands.chat.form.fill', args),
+        },
+      },
       sidekickOptionsContainer: {
         open:  (args: unknown) => console.log('[mock-sdk] uiCommands.sidekickOptionsContainer.open', args),
         close: (args: unknown) => console.log('[mock-sdk] uiCommands.sidekickOptionsContainer.close', args),
@@ -112,3 +121,16 @@ export const pluginLogger = {
   warn:  (...args: unknown[]) => console.warn('[mock-sdk] warn:', ...args),
   error: (...args: unknown[]) => console.error('[mock-sdk] error:', ...args),
 };
+
+// ---------------------------------------------------------------------------
+// Enum exports — the LessonHub rail imports these from the SDK alias
+// ---------------------------------------------------------------------------
+export enum UserListUiDataNames { USER_LIST_IS_OPEN = 'USER_LIST_IS_OPEN' }
+export enum LayoutPresentatioAreaUiDataNames { CURRENT_ELEMENT = 'CURRENT_ELEMENT' }
+export enum UiLayouts {
+  PINNED_SHARED_NOTES = 'PINNED_SHARED_NOTES',
+  EXTERNAL_VIDEO = 'EXTERNAL_VIDEO',
+  SCREEN_SHARE = 'SCREEN_SHARE',
+  WHITEBOARD = 'WHITEBOARD',
+  GENERIC_CONTENT = 'GENERIC_CONTENT',
+}

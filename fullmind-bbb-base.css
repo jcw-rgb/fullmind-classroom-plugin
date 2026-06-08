@@ -179,6 +179,7 @@ li, label, th, td {
   --fm-danger:          #E0182D; /* destructive (leave / end-call)      */
   --fm-rec:             #9E3A42; /* recording chip — toned-down red (ported from prototype 6/2; was --fm-danger) */
   --fm-neutral-off:     #ADB5BD; /* Gray 500 — toggle OFF / disabled neutral */
+  --fm-gray-100:        #F8F9FA; /* Gray 100 — light neutral surface (nav rail bg, separates rail from white panels) */
 
   /* Text */
   --fm-text:            #212529; /* Gray 900 */
