@@ -27,7 +27,7 @@ import { useSessionTiming } from './use-session-timing';
 
 // Minutes-remaining that triggers the prompt. The mockup shows 20; this is the single
 // knob — the message text derives from it, so the number shown can never disagree.
-const MINI_LESSON_PROMPT_MINUTES = 55;
+const MINI_LESSON_PROMPT_MINUTES = 20;
 
 // Self-contained tokens (mockup-matched), same pattern as the band's FALLBACK.
 const TOKENS = {
@@ -98,7 +98,7 @@ export function MiniLessonPromptView(
     >
       <div
         style={{
-          width: 'min(520px, 100%)',
+          width: 'min(540px, 100%)',
           background: TOKENS.card,
           borderRadius: 20,
           boxShadow: '0 24px 60px rgba(20, 17, 34, 0.35)',
@@ -138,23 +138,26 @@ export function MiniLessonPromptView(
         <p
           style={{
             margin: '0 0 24px',
-            fontSize: 19,
+            fontSize: 18,
             lineHeight: 1.45,
             color: TOKENS.ink,
           }}
         >
           <strong style={{ color: TOKENS.plum, fontWeight: 700 }}>
-            {`${MINI_LESSON_PROMPT_MINUTES} minutes remaining`}
+            {`${MINI_LESSON_PROMPT_MINUTES} minutes `}
           </strong>
-          {' in the current session, please begin the '}
+          {' remaining, begin '}
           <strong style={{ color: TOKENS.plum, fontWeight: 700 }}>
-            {'Mini Lesson '}
+            {'Mini-Lesson '}
           </strong>
-          {' if applicable, and remember to have students complete the '}
+          {' if applicable.'}
+          <br></br>
+          <br></br>
+          {'Please remember to have students complete the '}
           <strong style={{ color: TOKENS.plum, fontWeight: 700 }}>
             {'Exit Ticket '}
           </strong>
-          {' during this session.'}
+          {' during the session.'}
         </p>
 
         <button
