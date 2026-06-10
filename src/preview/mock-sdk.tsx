@@ -45,12 +45,26 @@ const MOCK_SESSION_TIMING = {
   data: { meeting: [{ createdTime: MOCK_SESSION_START, durationInSeconds: 60 * 60 }] },
 };
 
+// Preview-only current user. Drives the mini-lesson prompt's moderator gate — flip
+// role to 'VIEWER' locally to verify the student (no-prompt) path.
+const MOCK_CURRENT_USER = {
+  data: {
+    userId: 'preview-user',
+    extId: 'preview-user',
+    name: 'Preview Educator',
+    role: 'MODERATOR',
+    presenter: true,
+    cameras: [],
+  },
+};
+
 function makeMockApi(): PluginApi {
   return {
     useLoadedChatMessages: () => ({ data: MOCK_MESSAGES }),
     useLoadedUserList:     () => ({ data: MOCK_USERS }),
     useTalkingIndicator:   () => ({ data: MOCK_VOICES }),
     useCustomSubscription: () => MOCK_SESSION_TIMING,
+    useCurrentUser:        () => MOCK_CURRENT_USER,
 
     serverCommands: {
       chat: {

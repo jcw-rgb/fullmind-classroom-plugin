@@ -14,6 +14,7 @@ import { createRoot } from 'react-dom/client';
 
 import { LessonHubView } from '../fullmind-classroom/features/lesson-hub-rail';
 import { SessionProgressView } from '../fullmind-classroom/session-progress-bar';
+import { MiniLessonPromptView } from '../fullmind-classroom/features/mini-lesson-prompt';
 
 // A stable, arbitrary UUID for the preview — the mock-sdk ignores it anyway.
 const PREVIEW_UUID = 'preview-00000000-0000-0000-0000-000000000000';
@@ -60,6 +61,10 @@ function App() {
 
       {/* The real rail component — position:fixed; pins to left edge naturally */}
       <LessonHubView pluginUuid={PREVIEW_UUID} />
+
+      {/* Mini-lesson prompt — hidden unless the mock clock drops to ≤ threshold. To
+          see it locally, lower the mock session timing in mock-sdk.tsx. */}
+      <MiniLessonPromptView pluginUuid={PREVIEW_UUID} />
     </div>
   );
 }
