@@ -25,8 +25,12 @@ export interface ExitTicketQuestion {
 }
 
 // Answer payload (student → moderators). Carries the student's OWN extId — the relay key.
-// extId is knowable only for oneself (the SDK exposes peer ids without extId), which is
-// what prevents a student from submitting as a classmate.
+// TRUST ASSUMPTION (be honest here): submitAnswer stamps the caller's own extId, and the
+// SDK does not expose peers' extId, so a peer's extId (an opaque LMS role uuid) isn't
+// readily knowable — that raises the spoofing bar. But the relay keys on this SELF-ASSERTED
+// payload extId, NOT on the entry's BBB-verified fromUserId, so a student who obtains a
+// classmate's extId out-of-band could submit as them. Hardening (reconcile against
+// fromUserId at the vidapi/LMS boundary) is a follow-up; see the exit-ticket spec.
 export interface AnswerEntry {
   extId: string;
   text?: string;

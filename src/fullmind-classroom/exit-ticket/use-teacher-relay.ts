@@ -39,13 +39,18 @@ export function useTeacherRelay(
     const todo = unrelayedAnswers(answerEntries, relayed.current);
     todo.forEach((a) => {
       const { extId, ...answer } = a;
+      // Mark in-flight BEFORE the fetch: a concurrent channel re-tick (another student
+      // submitting) re-runs this effect, and without this the same extId — not yet in
+      // `relayed` — would be selected again and double-POST. On failure we un-mark so the
+      // next tick retries (self-heal preserved; reconnect still re-reads via a fresh ref).
+      relayed.current.add(extId);
       fetch(`${ingressBase}/public/a/bbb/exit-ticket/answer/${meetingId}/${extId}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...answer, relayToken }),
       })
-        .then((r) => { if (r.ok) relayed.current.add(extId); })
-        .catch(() => { /* leave un-relayed; next channel tick retries (self-heal) */ });
+        .then((r) => { if (!r.ok) relayed.current.delete(extId); })
+        .catch(() => { relayed.current.delete(extId); });
     });
   }, [enabled, ingressBase, meetingId, relayToken, answerEntries]);
 }
