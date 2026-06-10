@@ -1,11 +1,12 @@
 import * as React from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo } from 'react';
 import * as ReactDOM from 'react-dom/client';
 import {
   BbbPluginSdk,
   PluginApi,
   FloatingWindow,
 } from 'bigbluebutton-html-plugin-sdk';
+import { useSessionTiming } from './features/use-session-timing';
 
 /**
  * Session Progress band — prototype pin 4 ("PLUGIN LATER").
@@ -67,30 +68,6 @@ function cssVar(name: string, fallback: string): string {
   return v || fallback;
 }
 
-// GraphQL subscription for the room clock.
-// ⚠️ DEV: confirm these two field names against the LIVE BBB 3.0 `meeting` schema in
-// the first room test. If they differ, this string is the ONLY thing that changes —
-// the math below is generic.
-//   • createdTime       — epoch ms the meeting was created (the start clock)
-//   • durationInSeconds — configured length; 0 means "no limit"
-const SESSION_TIMING_SUBSCRIPTION = `
-  subscription FullmindSessionTiming {
-    meeting {
-      createdTime
-      durationInSeconds
-    }
-  }
-`;
-
-interface MeetingTimingRow {
-  createdTime: number;
-  durationInSeconds: number;
-}
-
-interface MeetingTimingResponse {
-  meeting: MeetingTimingRow[];
-}
-
 // MM:SS (minutes un-padded, seconds two-digit) — e.g. "40:00", "5:03", "0:00".
 function formatMMSS(ms: number): string {
   const totalSec = Math.max(Math.round(ms / 1000), 0);
@@ -101,10 +78,10 @@ function formatMMSS(ms: number): string {
 }
 
 /**
- * The band itself. Rendered into the floating window's detached root, so it owns its
- * own subscription + 1s tick and re-renders in place as time advances. The only
- * motion is the fill edge creeping right — calm, glanceable, ambient (no pulse, no
- * live dot, no sheen — decided 2026-06-03).
+ * The band itself. Rendered into the floating window's detached root; the shared
+ * useSessionTiming hook drives the subscription + 1s tick, so the band re-renders in
+ * place as time advances. The only motion is the fill edge creeping right — calm,
+ * glanceable, ambient (no pulse, no live dot, no sheen — decided 2026-06-03).
  */
 export function SessionProgressView(
   { pluginUuid }: { pluginUuid: string },
@@ -112,18 +89,10 @@ export function SessionProgressView(
   BbbPluginSdk.initialize(pluginUuid); // idempotent — just (re)binds the api handle
   const pluginApi: PluginApi = BbbPluginSdk.getPluginApi(pluginUuid);
 
-  const timing = pluginApi.useCustomSubscription<MeetingTimingResponse>(
-    SESSION_TIMING_SUBSCRIPTION,
-  );
-  const row = timing?.data?.meeting?.[0];
-
-  // The tick that drives the smooth fill + the countdown. Once a second is cheap and
-  // keeps the bar honest without spamming re-renders.
-  const [now, setNow] = useState<number>(() => Date.now());
-  useEffect(() => {
-    const intervalId = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(intervalId);
-  }, []);
+  // Session clock — shared hook owns the subscription + 1s tick + math.
+  const {
+    hasDuration, remainingMs, fraction, loading,
+  } = useSessionTiming(pluginApi);
 
   // Height + colors from the reskin's CSS vars (single source of truth), read once.
   const tokens = useMemo(() => ({
@@ -132,16 +101,10 @@ export function SessionProgressView(
     coral: cssVar('--fm-coral', FALLBACK.coral),
   }), []);
 
-  const totalMs = (row?.durationInSeconds ?? 0) * 1000;
-  const hasDuration = totalMs > 0;
-  const elapsedMs = row ? Math.max(now - row.createdTime, 0) : 0;
-  const fraction = hasDuration ? Math.min(elapsedMs / totalMs, 1) : 0;
-  const remainingMs = hasDuration ? Math.max(totalMs - elapsedMs, 0) : 0;
-
   // Right-hand readout + percent. Three honest states: loading, unlimited, counting.
   let readout: string;
   let percent: string;
-  if (!row) {
+  if (loading) {
     readout = '…';
     percent = '';
   } else if (!hasDuration) {
