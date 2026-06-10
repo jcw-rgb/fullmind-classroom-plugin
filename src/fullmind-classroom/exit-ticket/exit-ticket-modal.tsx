@@ -63,7 +63,11 @@ export function ExitTicketModal(
                   style={{ width: '100%', borderRadius: 14, border: `2px solid ${GRAY}`, padding: 12, font: 'inherit', boxSizing: 'border-box' }}
                 />
               )}
-              {/* File type 'f' is handled in Task 5 (deferred — needs the pre-signed-S3 sub-spec). */}
+              {/* File type 'f' is deferred (Task 5 — needs the pre-signed-S3 sub-spec). Render an
+                  honest placeholder rather than a silently un-submittable empty body. */}
+              {question.response_type === 'f' && (
+                <p style={{ margin: 0, color: '#6C757D', fontSize: 14 }}>File upload is coming soon.</p>
+              )}
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 12, color: '#6C757D', marginBottom: 4 }}>Rate today&apos;s lesson</div>
                 <StarRating value={rating} onChange={setRating} />

@@ -61,7 +61,7 @@ export function StarRating(
           onClick={() => onChange(n)}
           style={{
             background: 'none', border: 'none', cursor: 'pointer', fontSize: 24,
-            lineHeight: 1, padding: 4, color: n <= value ? CORAL : GRAY,
+            lineHeight: 1, padding: 10, color: n <= value ? CORAL : GRAY, // padding→44px touch target
           }}
         >
           ★

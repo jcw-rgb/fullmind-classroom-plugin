@@ -22,7 +22,9 @@ export function ExitTicketTeacherPanel(
       <div style={{ background: PLUM, color: '#fff', padding: '10px 14px', fontWeight: 600, fontSize: 14 }}>Exit Ticket — live</div>
       <div style={{ padding: 14 }}>
         <div style={{ fontSize: 28, fontWeight: 700 }}>
-          {submitted} <span style={{ fontSize: 16, color: '#6C757D' }}>of {total}</span>
+          {/* clamp: a viewer who submits then leaves can push `submitted` past the live
+              roster `total`, which would otherwise render a nonsensical "3 of 2". */}
+          {Math.min(submitted, total)} <span style={{ fontSize: 16, color: '#6C757D' }}>of {total}</span>
         </div>
         <div style={{ fontSize: 13, color: outstanding ? '#6C757D' : '#198754', marginTop: 2 }}>
           {outstanding ? `${outstanding} still working…` : 'Everyone submitted'}
