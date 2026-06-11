@@ -10,7 +10,9 @@ const GRAY = '#DEE2E6';
  * so the selection logic is verifiable on its own.
  */
 export function ChoiceInput(
-  { type, choices, selected, onChange }: {
+  {
+    type, choices, selected, onChange,
+  }: {
     type: 's' | 'm';
     choices: { index: string; text: string }[];
     selected: string[];
@@ -31,9 +33,14 @@ export function ChoiceInput(
             type="button"
             onClick={() => toggle(c.index)}
             style={{
-              textAlign: 'left', padding: '12px 14px', borderRadius: 14,
-              border: `2px solid ${on ? CORAL : GRAY}`, background: on ? 'rgba(243,113,103,0.08)' : '#fff',
-              font: 'inherit', cursor: 'pointer', minHeight: 44, // 44px touch target (a11y)
+              textAlign: 'left',
+              padding: '12px 14px',
+              borderRadius: 14,
+              border: `2px solid ${on ? CORAL : GRAY}`,
+              background: on ? 'rgba(243,113,103,0.08)' : '#fff',
+              font: 'inherit',
+              cursor: 'pointer',
+              minHeight: 44, // 44px touch target (a11y)
             }}
           >
             {c.text}
@@ -60,8 +67,13 @@ export function StarRating(
           aria-label={`Rate ${n} of 5`}
           onClick={() => onChange(n)}
           style={{
-            background: 'none', border: 'none', cursor: 'pointer', fontSize: 24,
-            lineHeight: 1, padding: 10, color: n <= value ? CORAL : GRAY, // padding→44px touch target
+            background: 'none',
+            border: 'none',
+            cursor: 'pointer',
+            fontSize: 24,
+            lineHeight: 1,
+            padding: 10,
+            color: n <= value ? CORAL : GRAY, // padding→44px touch target
           }}
         >
           ★

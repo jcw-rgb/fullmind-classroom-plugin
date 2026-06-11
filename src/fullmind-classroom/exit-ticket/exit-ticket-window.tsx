@@ -27,7 +27,13 @@ function ExitTicketView({ pluginUuid }: { pluginUuid: string }): React.ReactElem
 
   if (!et.isOpen) return null;
   if (et.isModerator) {
-    return <ExitTicketTeacherPanel submitted={et.submittedCount} total={studentTotal} onClose={et.closeTicket} />;
+    return (
+      <ExitTicketTeacherPanel
+        submitted={et.submittedCount}
+        total={studentTotal}
+        onClose={et.closeTicket}
+      />
+    );
   }
   if (!et.question) return null;
   return <ExitTicketModal question={et.question} onSubmit={et.submitAnswer} />;

@@ -13,10 +13,10 @@ export function unrelayedAnswers(
   relayed: Set<string>,
 ): AnswerEntry[] {
   const latest = new Map<string, AnswerEntry>();
-  for (const e of entries) {
+  entries.forEach((e) => {
     const a = e?.payloadJson;
     if (a?.extId && !relayed.has(a.extId)) latest.set(a.extId, a);
-  }
+  });
   return Array.from(latest.values()); // Array.from (not spread) — es5 target, no downlevelIteration
 }
 

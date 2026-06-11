@@ -34,6 +34,6 @@ export interface ExitTicketQuestion {
 export interface AnswerEntry {
   extId: string;
   text?: string;
-  choices?: string[];   // selected choice indexes
-  rating?: number;      // 1..5
+  choices?: string[]; // selected choice indexes
+  rating?: number; // 1..5
 }

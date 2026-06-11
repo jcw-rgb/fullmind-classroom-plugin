@@ -26,13 +26,19 @@ export function useExitTicket(pluginUuid: string) {
   const isModerator = me?.role === 'MODERATOR';
 
   // Control channel: latest open/close wins; everyone reads.
-  const control = pluginApi.useDataChannel<ControlEntry>(CONTROL_CHANNEL, DataChannelTypes.LATEST_ITEM);
+  const control = pluginApi.useDataChannel<ControlEntry>(
+    CONTROL_CHANNEL,
+    DataChannelTypes.LATEST_ITEM,
+  );
   const controlEntries = control?.data?.data ?? [];
   const latestControl = controlEntries[controlEntries.length - 1]?.payloadJson;
   const isOpen = latestControl?.state === 'open';
 
   // Answers channel: students push their own answer to moderators only.
-  const answers = pluginApi.useDataChannel<AnswerEntry>(ANSWERS_CHANNEL, DataChannelTypes.All_ITEMS);
+  const answers = pluginApi.useDataChannel<AnswerEntry>(
+    ANSWERS_CHANNEL,
+    DataChannelTypes.All_ITEMS,
+  );
 
   // Route-in: fetch the question only while the ticket is open (onDemand source).
   // getRemoteData resolves the already-parsed object, so use it directly (no .json()).

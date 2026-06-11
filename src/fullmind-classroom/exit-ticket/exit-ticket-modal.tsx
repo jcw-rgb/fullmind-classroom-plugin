@@ -39,12 +39,26 @@ export function ExitTicketModal(
 
   return (
     <div style={{
-      position: 'fixed', inset: 0, zIndex: 50, display: 'flex', alignItems: 'center',
-      justifyContent: 'center', background: 'rgba(33,37,41,.55)', fontFamily: FONT,
-    }}>
-      <div style={{ width: 'min(520px, 92vw)', background: '#FFFCFA', borderRadius: 14, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.3)' }}>
-        <div style={{ background: PLUM, color: '#fff', padding: '14px 20px', fontWeight: 600 }}>
-          Exit Ticket{question.topic ? ` — ${question.topic}` : ''}
+      position: 'fixed',
+      inset: 0,
+      zIndex: 50,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      background: 'rgba(33,37,41,.55)',
+      fontFamily: FONT,
+    }}
+    >
+      <div style={{
+        width: 'min(520px, 92vw)', background: '#FFFCFA', borderRadius: 14, overflow: 'hidden', boxShadow: '0 12px 40px rgba(0,0,0,.3)',
+      }}
+      >
+        <div style={{
+          background: PLUM, color: '#fff', padding: '14px 20px', fontWeight: 600,
+        }}
+        >
+          Exit Ticket
+          {question.topic ? ` — ${question.topic}` : ''}
         </div>
         <div style={{ padding: 20, color: '#212529' }}>
           {submitted ? (
@@ -53,14 +67,21 @@ export function ExitTicketModal(
             <>
               <p style={{ marginTop: 0, fontSize: 16, lineHeight: 1.5 }}>{question.text}</p>
               {(question.response_type === 's' || question.response_type === 'm') && (
-                <ChoiceInput type={question.response_type} choices={question.choices} selected={choices} onChange={setChoices} />
+                <ChoiceInput
+                  type={question.response_type}
+                  choices={question.choices}
+                  selected={choices}
+                  onChange={setChoices}
+                />
               )}
               {question.response_type === 't' && (
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   rows={4}
-                  style={{ width: '100%', borderRadius: 14, border: `2px solid ${GRAY}`, padding: 12, font: 'inherit', boxSizing: 'border-box' }}
+                  style={{
+                    width: '100%', borderRadius: 14, border: `2px solid ${GRAY}`, padding: 12, font: 'inherit', boxSizing: 'border-box',
+                  }}
                 />
               )}
               {/* File type 'f' is deferred (Task 5 — needs the pre-signed-S3 sub-spec). Render an
@@ -72,15 +93,24 @@ export function ExitTicketModal(
                 <div style={{ fontSize: 12, color: '#6C757D', marginBottom: 4 }}>Rate today&apos;s lesson</div>
                 <StarRating value={rating} onChange={setRating} />
               </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20 }}>
+              <div style={{
+                display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20,
+              }}
+              >
                 <button
                   type="button"
                   disabled={!canSubmit}
                   onClick={submit}
                   style={{
-                    background: canSubmit ? CORAL : GRAY, color: '#fff', border: 'none',
-                    borderRadius: 10, padding: '10px 18px', fontWeight: 600,
-                    cursor: canSubmit ? 'pointer' : 'default', font: 'inherit', minHeight: 44,
+                    background: canSubmit ? CORAL : GRAY,
+                    color: '#fff',
+                    border: 'none',
+                    borderRadius: 10,
+                    padding: '10px 18px',
+                    fontWeight: 600,
+                    cursor: canSubmit ? 'pointer' : 'default',
+                    font: 'inherit',
+                    minHeight: 44,
                   }}
                 >
                   Submit
