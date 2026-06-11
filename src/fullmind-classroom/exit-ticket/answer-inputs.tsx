@@ -37,6 +37,9 @@ export function ChoiceInput(
               padding: '12px 14px',
               borderRadius: 14,
               border: `2px solid ${on ? CORAL : GRAY}`,
+              // Coral focus ring instead of the browser's default blue outline.
+              outline: 'none',
+              boxShadow: on ? `0 0 0 1px ${CORAL}` : 'none',
               background: on ? 'rgba(243,113,103,0.08)' : '#fff',
               font: 'inherit',
               cursor: 'pointer',

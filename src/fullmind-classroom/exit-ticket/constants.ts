@@ -1,7 +1,14 @@
 // One source of truth for every exit-ticket module. These names MUST match the
 // manifest (Phase 3 Task 1) and the Phase 2 vidapi contract.
 export const PLUGIN_NAME = 'FullmindClassroom';
-export const REMOTE_SOURCE = 'exitTicket';
+
+// vidapi ingress base. BBB 3.0.18 does NOT serve plugin remoteDataSources over HTTP
+// (the /api/plugin/{name}/{source}/ endpoint returns nginx 404 — the server half of that
+// SDK feature isn't shipped), so the plugin fetches the question DIRECTLY from vidapi
+// (CORS-enabled) instead of via pluginApi.getRemoteData. Same base also receives relayed
+// answers. MUST be injected per environment at build/deploy time (the vidapi ingress
+// origin); empty by default so no environment-specific URL is hardcoded in source.
+export const INGRESS_BASE = '';
 export const CONTROL_CHANNEL = 'exit-ticket-control';
 export const ANSWERS_CHANNEL = 'exit-ticket-answers';
 
@@ -9,7 +16,7 @@ export const ANSWERS_CHANNEL = 'exit-ticket-answers';
 export type ControlState = 'open' | 'close';
 export interface ControlEntry { state: ControlState; }
 
-// The question routed in via getRemoteData('exitTicket'). Shape = the Phase 2
+// The question fetched directly from vidapi (see INGRESS_BASE). Shape = the Phase 2
 // question-proxy response: the LMS question JSON augmented with meetingId + relayToken.
 // `meetingId` (external) is what the relay URL is built from; `relayToken` authorizes
 // the relay POST. Both are added by vidapi, not the LMS.

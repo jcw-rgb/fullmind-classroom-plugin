@@ -4,6 +4,7 @@ import {
 } from 'bigbluebutton-html-plugin-sdk';
 import { useExitTicket } from './use-exit-ticket';
 import { useTeacherRelay } from './use-teacher-relay';
+import { INGRESS_BASE } from './constants';
 
 /**
  * Exit Ticket — the prototype's "Start Exit Ticket" item in the ⊕ Actions menu,
@@ -25,11 +26,6 @@ const LOG = '[Fullmind]';
 // against the live bbb-icons set on first room test — a missing glyph only blanks the
 // icon, never hides the item. This is the ONE place to change the icon.
 const EXIT_TICKET_ICON = 'check';
-
-// Where the teacher relay POSTs answers (vidapi ingress). Sourced in Phase 4 alongside
-// the UI (webpack DefinePlugin constant or a field on the question payload). Until then
-// it's empty and the relay safely no-ops (useTeacherRelay guards on it).
-const INGRESS_BASE = '';
 
 function ExitTicket({ pluginUuid }: { pluginUuid: string }): null {
   BbbPluginSdk.initialize(pluginUuid);

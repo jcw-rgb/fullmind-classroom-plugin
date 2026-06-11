@@ -17,7 +17,7 @@ const FONT = '"Plus Jakarta Sans", system-ui, sans-serif';
  */
 export function ExitTicketModal(
   { question, onSubmit }: {
-    question: ExitTicketQuestion;
+    question: ExitTicketQuestion | null;
     onSubmit: (answer: Omit<AnswerEntry, 'extId'>) => void;
   },
 ): React.ReactElement {
@@ -26,12 +26,19 @@ export function ExitTicketModal(
   const [rating, setRating] = useState(0);
   const [submitted, setSubmitted] = useState(false);
 
-  const canSubmit = question.response_type === 't' ? text.trim().length > 0 : choices.length > 0;
+  const rt = question?.response_type;
+  // With no question loaded, the student can still submit a rating. With a question,
+  // require its answer (text for 't', a choice for 's'/'m').
+  const canSubmit = ((): boolean => {
+    if (rt === 't') return text.trim().length > 0;
+    if (rt === 's' || rt === 'm') return choices.length > 0;
+    return rating > 0;
+  })();
 
   const submit = () => {
     const answer: Omit<AnswerEntry, 'extId'> = {};
-    if (question.response_type === 't') answer.text = text.trim();
-    else answer.choices = choices;
+    if (rt === 't') answer.text = text.trim();
+    else if (rt === 's' || rt === 'm') answer.choices = choices;
     if (rating > 0) answer.rating = rating;
     onSubmit(answer);
     setSubmitted(true);
@@ -54,27 +61,28 @@ export function ExitTicketModal(
       }}
       >
         <div style={{
-          background: PLUM, color: '#fff', padding: '14px 20px', fontWeight: 600,
+          background: PLUM, color: '#fff', padding: '14px 20px', fontWeight: 600, textAlign: 'center',
         }}
         >
-          Exit Ticket
-          {question.topic ? ` — ${question.topic}` : ''}
+          {submitted ? 'Student Exit Ticket Completed!' : 'Student Exit Ticket'}
         </div>
         <div style={{ padding: 20, color: '#212529' }}>
           {submitted ? (
-            <p style={{ margin: 0, fontSize: 16 }}>Thanks — your answer was submitted.</p>
+            <p style={{ margin: 0, fontSize: 16, textAlign: 'center' }}>Great job! Thank you for submitting the exit ticket.</p>
           ) : (
             <>
-              <p style={{ marginTop: 0, fontSize: 16, lineHeight: 1.5 }}>{question.text}</p>
-              {(question.response_type === 's' || question.response_type === 'm') && (
+              {question?.text
+                ? <p style={{ marginTop: 0, fontSize: 16, lineHeight: 1.5 }}>{question.text}</p>
+                : <p style={{ marginTop: 0, fontSize: 14, color: '#6C757D' }}>Loading question…</p>}
+              {(rt === 's' || rt === 'm') && (
                 <ChoiceInput
-                  type={question.response_type}
-                  choices={question.choices}
+                  type={rt}
+                  choices={question?.choices ?? []}
                   selected={choices}
                   onChange={setChoices}
                 />
               )}
-              {question.response_type === 't' && (
+              {rt === 't' && (
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
@@ -86,7 +94,7 @@ export function ExitTicketModal(
               )}
               {/* File type 'f' is deferred (Task 5 — needs the pre-signed-S3 sub-spec). Render an
                   honest placeholder rather than a silently un-submittable empty body. */}
-              {question.response_type === 'f' && (
+              {rt === 'f' && (
                 <p style={{ margin: 0, color: '#6C757D', fontSize: 14 }}>File upload is coming soon.</p>
               )}
               <div style={{ marginTop: 16 }}>

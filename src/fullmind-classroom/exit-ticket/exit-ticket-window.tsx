@@ -35,8 +35,15 @@ function ExitTicketView({ pluginUuid }: { pluginUuid: string }): React.ReactElem
       />
     );
   }
-  if (!et.question) return null;
-  return <ExitTicketModal question={et.question} onSubmit={et.submitAnswer} />;
+  // Always render the modal while the ticket is open — never gate it on the question
+  // having loaded, so the student always sees the rating + Submit even if the routed-in
+  // question is still loading or unavailable. The question text/input fill in once it loads.
+  return (
+    <ExitTicketModal
+      question={et.question}
+      onSubmit={et.submitAnswer}
+    />
+  );
 }
 
 export function makeExitTicketWindow(pluginUuid: string): FloatingWindow {
