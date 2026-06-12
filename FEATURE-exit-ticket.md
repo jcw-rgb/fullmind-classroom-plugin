@@ -1,12 +1,29 @@
 # Feature — Exit Ticket in BBB (in-room)
 
+> **⚠️ SUPERSEDED BY IMPLEMENTATION (2026-06-12).** This file and the linked spec
+> predate the build, and two of the "locked decisions" below did NOT survive contact
+> with BBB 3.0.18:
+> - **Route-in is NOT `remoteDataSources`** — BBB 3.0.x never implemented the server
+>   half of that SDK feature (its `/api/plugin/...` endpoint is an nginx 404). The
+>   plugin fetches the question DIRECTLY from vidapi over CORS. See the header
+>   comments in `src/fullmind-classroom/exit-ticket/constants.ts` and
+>   `use-exit-ticket.ts`.
+> - **Submit is NOT a vidapi data-channel harvester** — the TEACHER's client relays
+>   verified answers to vidapi (`use-teacher-relay.ts`), and type-'f' files upload
+>   browser→vidapi directly as multipart (a binary can't ride the data channel).
+>
+> The implementation is complete and live-verified; the code comments are the source
+> of truth for the as-built architecture.
+
 Educator authors an exit ticket in the LMS → the plugin routes it **into** the
 BBB room → educator clicks **⊕ Actions → "Start Exit Ticket"** → it pops up on
 **every student's screen** → answers return to the LMS's existing per-session
 record (same reports + grading the educator already uses). Students never leave
 the room.
 
-**Status (2026-06-08): design approved, implementation not started.**
+**Status (2026-06-12): BUILT and live-verified on bbb0-v3** (all four answer types,
+rating, teacher count, file upload byte-exact in S3). Original status at design time
+(2026-06-08): design approved, implementation not started.
 
 📄 **Canonical design:** `docs/superpowers/specs/2026-06-08-bbb-exit-ticket-design.md`
 — full architecture, data flow, security model, components per codebase, error

@@ -11,10 +11,11 @@ import { ExitTicketTeacherPanel } from './exit-ticket-teacher-panel';
  * FloatingWindow-with-its-own-ReactDOM-root pattern (the proven overlay template), so the
  * SDK data hooks work inside this detached root.
  *
- *   • closed                 → null (registered always; visible only while open)
- *   • open + moderator        → teacher panel (N of M + Close)
- *   • open + viewer + question → student modal
- *   • open + viewer, no question yet → null (waiting for route-in)
+ *   • closed          → null (registered always; visible only while open)
+ *   • open + moderator → teacher panel (N of M + Close)
+ *   • open + viewer    → student modal, ALWAYS (never gated on the question having
+ *     loaded — text/input fill in when the fetch lands; on fetch error the modal
+ *     offers the rating-only fallback)
  */
 function ExitTicketView({ pluginUuid }: { pluginUuid: string }): React.ReactElement | null {
   BbbPluginSdk.initialize(pluginUuid);

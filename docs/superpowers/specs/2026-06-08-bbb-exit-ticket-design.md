@@ -1,7 +1,30 @@
 # Design — Exit Ticket in BBB (in-room)
 
+> **⚠️ ADDENDUM (2026-06-12) — two mechanisms below were superseded during the build.**
+> This spec is kept as the design-time record; the as-built deviations, both forced by
+> BBB 3.0.18 realities and both live-verified:
+>
+> 1. **Route-in.** `remoteDataSources`/`getRemoteData` has NO server implementation on
+>    BBB 3.0.x — the `/api/plugin/{name}/{source}/` endpoint the SDK calls returns a
+>    bare nginx 404 (verified against the 3.0.18 source: no nginx route, no bbb-web
+>    mapping, no akka handler). The plugin instead fetches the question DIRECTLY from
+>    vidapi's question proxy (GET added to the scoped exit-ticket CORS), discovering
+>    the external meeting id via `useCustomSubscription` on `meeting.extId`.
+> 2. **Return path.** There is no vidapi "harvester" polling BBB's data channel.
+>    Instead the TEACHER's plugin client relays each verified answer entry to vidapi
+>    (`use-teacher-relay.ts` — deduped per student, reconnect self-healing), and vidapi
+>    forwards server-to-server to the LMS with the meeting-scoped HMAC `relayToken`
+>    minted onto the question payload. Consequence: the browser DOES talk to vidapi
+>    (scoped CORS), never to the LMS. Type-'f' files upload browser→vidapi as
+>    multipart (not pre-signed S3) — a binary can't ride the data channel.
+>
+> The "Submit trust model", "no CORS change", and "pre-signed S3 PUT" lines below are
+> therefore historical. Security posture of the as-built path (self-asserted extId,
+> deferred fromUserId reconciliation, is_correct in the room payload) is documented in
+> `src/fullmind-classroom/exit-ticket/constants.ts` and the three PR descriptions.
+
 **Date:** 2026-06-08
-**Status:** Approved design — ready for implementation planning.
+**Status:** Superseded in part — see addendum above. (At design time: approved design.)
 **Tracking:** Spec-doc only (no Jira, per Justin 2026-06-08). The code-workflow is
 followed minus the Jira ticket (Step 1) and Jira comment (Step 7); TDD,
 verification, Opus backend review, and Justin's visual sign-off all still apply.
