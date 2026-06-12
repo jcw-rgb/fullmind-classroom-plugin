@@ -7,11 +7,17 @@ const CORAL_90 = '#FBD3D0'; // Deep Coral 90 — selected fill (replaces a freel
 const GRAY = '#DEE2E6'; // Gray 300 — idle border
 
 // Hover + keyboard-focus states can't be expressed inline, so they live in one scoped
-// stylesheet. :focus-visible (not :focus) shows the ring for keyboard users only, not on
-// mouse click — the correct a11y behaviour. Injected once where the choices render.
+// stylesheet. The state-driven border/background must ALSO live here (fed by inline CSS
+// custom properties) — an inline style beats any stylesheet pseudo-class, which would
+// leave :hover dead. :focus-visible (not :focus) shows the ring for keyboard users only,
+// not on mouse click — the correct a11y behaviour. Injected once where the choices render.
 const CHOICE_CSS = `
-  .fm-et-choice { transition: border-color .12s ease, box-shadow .12s ease; }
-  .fm-et-choice:hover { border-color: ${CORAL}; }
+  .fm-et-choice {
+    border: 2px var(--fm-et-bs, solid) var(--fm-et-bc, ${GRAY});
+    background: var(--fm-et-bg, #fff);
+    transition: border-color .12s ease, box-shadow .12s ease;
+  }
+  .fm-et-choice:not(:disabled):hover { border-color: ${CORAL}; }
   .fm-et-choice:focus-visible { outline: none; box-shadow: 0 0 0 3px ${CORAL_80}; }
 `;
 
@@ -51,14 +57,14 @@ export function ChoiceInput(
               padding: '12px 16px',
               borderRadius: 16,
               // Selected = coral border + coral-90 fill (the "outline" is the border); the
-              // keyboard focus ring is layered on by .fm-et-choice:focus-visible above.
-              border: `2px solid ${on ? CORAL : GRAY}`,
+              // border/background render via CHOICE_CSS so :hover/:focus-visible can win.
+              '--fm-et-bc': on ? CORAL : GRAY,
+              '--fm-et-bg': on ? CORAL_90 : '#fff',
               outline: 'none',
-              background: on ? CORAL_90 : '#fff',
               font: 'inherit',
               cursor: 'pointer',
               minHeight: 44, // 44px touch target (a11y)
-            }}
+            } as React.CSSProperties}
           >
             {c.text}
           </button>
@@ -76,7 +82,11 @@ export function ChoiceInput(
  * showing the file name. Clicking again re-opens the picker to swap the file.
  */
 export function FileInput(
-  { file, onChange }: { file: File | null; onChange: (f: File | null) => void },
+  { file, onChange, disabled }: {
+    file: File | null;
+    onChange: (f: File | null) => void;
+    disabled: boolean;
+  },
 ): React.ReactElement {
   const inputRef = React.useRef<HTMLInputElement>(null);
   return (
@@ -91,20 +101,22 @@ export function FileInput(
       <button
         type="button"
         className="fm-et-choice"
+        disabled={disabled}
         onClick={() => inputRef.current?.click()}
         style={{
           width: '100%',
           textAlign: 'center',
           padding: '12px 16px',
           borderRadius: 16,
-          border: `2px ${file ? `solid ${CORAL}` : `dashed ${GRAY}`}`,
+          '--fm-et-bs': file ? 'solid' : 'dashed',
+          '--fm-et-bc': file ? CORAL : GRAY,
+          '--fm-et-bg': file ? CORAL_90 : '#fff',
           outline: 'none',
-          background: file ? CORAL_90 : '#fff',
           font: 'inherit',
-          cursor: 'pointer',
+          cursor: disabled ? 'default' : 'pointer',
           minHeight: 44, // 44px touch target (a11y)
           color: '#212529',
-        }}
+        } as React.CSSProperties}
       >
         {file ? file.name : 'Choose a file to upload'}
       </button>
@@ -122,7 +134,11 @@ export function FileInput(
  * aria-label per star keeps it operable/testable without relying on the glyph.
  */
 export function StarRating(
-  { value, onChange }: { value: number; onChange: (n: number) => void },
+  { value, onChange, disabled }: {
+    value: number;
+    onChange: (n: number) => void;
+    disabled: boolean;
+  },
 ): React.ReactElement {
   return (
     <div style={{ display: 'flex', gap: 4 }}>
@@ -131,11 +147,12 @@ export function StarRating(
           key={n}
           type="button"
           aria-label={`Rate ${n} of 5`}
+          disabled={disabled}
           onClick={() => onChange(n)}
           style={{
             background: 'none',
             border: 'none',
-            cursor: 'pointer',
+            cursor: disabled ? 'default' : 'pointer',
             fontSize: 24,
             lineHeight: 1,
             padding: 10,

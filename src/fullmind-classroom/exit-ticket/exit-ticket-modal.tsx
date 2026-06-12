@@ -15,7 +15,10 @@ const DANGER = '#E0182D'; // Danger 50 — error text
 const FONT = '"Plus Jakarta Sans", system-ui, sans-serif';
 
 // Submit interactive states (hover/active/keyboard-focus) — pseudo-classes can't be inline.
+// The state-driven background must ALSO live here (fed by an inline CSS custom property):
+// an inline background would beat the :hover/:active rules and leave them dead.
 const SUBMIT_CSS = `
+  .fm-et-submit { background: var(--fm-et-submit-bg, ${CORAL}); transition: background .12s ease, box-shadow .12s ease; }
   .fm-et-submit:not(:disabled):hover { background: ${CORAL_60}; }
   .fm-et-submit:not(:disabled):active { background: ${CORAL_50}; }
   .fm-et-submit:focus-visible { outline: none; box-shadow: 0 0 0 3px ${CORAL_80}; }
@@ -142,14 +145,16 @@ export function ExitTicketModal(
                 />
               )}
               {rt === 'f' && (
-                <FileInput file={file} onChange={setFile} />
+                <FileInput file={file} onChange={setFile} disabled={uploading} />
               )}
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 12, color: '#6C757D', marginBottom: 4 }}>Rate today&apos;s lesson</div>
-                <StarRating value={rating} onChange={setRating} />
+                {/* Disabled while uploading: the in-flight submit captured the click-time
+                    rating, so later star clicks would silently not be what gets saved. */}
+                <StarRating value={rating} onChange={setRating} disabled={uploading} />
               </div>
               {uploadError && (
-                <p style={{ margin: '12px 0 0', fontSize: 14, color: DANGER }}>
+                <p role="alert" style={{ margin: '12px 0 0', fontSize: 14, color: DANGER }}>
                   Couldn&apos;t upload your file — please try submitting again.
                 </p>
               )}
@@ -164,8 +169,9 @@ export function ExitTicketModal(
                   onClick={submit}
                   style={{
                     // Disabled = the system disabled pair (Gray 300 bg / Gray 500 text), not
-                    // faded coral — so it reads as inert rather than almost-clickable.
-                    background: canSubmit ? CORAL : GRAY,
+                    // faded coral — so it reads as inert rather than almost-clickable. The
+                    // background renders via SUBMIT_CSS so :hover/:active can win over it.
+                    '--fm-et-submit-bg': canSubmit ? CORAL : GRAY,
                     color: canSubmit ? '#fff' : GRAY_500,
                     border: 'none',
                     borderRadius: 12,
@@ -174,7 +180,7 @@ export function ExitTicketModal(
                     cursor: canSubmit ? 'pointer' : 'default',
                     font: 'inherit',
                     minHeight: 44,
-                  }}
+                  } as React.CSSProperties}
                 >
                   {uploading ? 'Uploading…' : 'Submit exit ticket'}
                 </button>
