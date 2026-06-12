@@ -1,6 +1,18 @@
 {
   "requiredSdkVersion": "~0.0.73",
   "name": "FullmindClassroom",
-  "version": "0.0.6",
-  "javascriptEntrypointUrl": "FullmindClassroom.js"
+  "version": "0.0.8",
+  "javascriptEntrypointUrl": "FullmindClassroom.js",
+  "dataChannels": [
+    {
+      "name": "exit-ticket-control",
+      "pushPermission": ["moderator", "presenter"],
+      "replaceOrDeletePermission": ["moderator"]
+    },
+    {
+      "name": "exit-ticket-answers",
+      "pushPermission": ["all"],
+      "replaceOrDeletePermission": ["moderator"]
+    }
+  ]
 }
