@@ -41,6 +41,7 @@ function ExitTicketView({ pluginUuid }: { pluginUuid: string }): React.ReactElem
   return (
     <ExitTicketModal
       question={et.question}
+      error={et.questionError}
       onSubmit={et.submitAnswer}
     />
   );

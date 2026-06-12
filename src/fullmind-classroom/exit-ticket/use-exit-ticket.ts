@@ -58,16 +58,20 @@ export function useExitTicket(pluginUuid: string) {
   // /api/plugin/{name}/{source}/ endpoint returns nginx 404), so we bypass it and fetch the
   // vidapi question endpoint ourselves (CORS-enabled).
   const [question, setQuestion] = useState<ExitTicketQuestion | null>(null);
+  // questionError distinguishes "fetch failed" from "still loading" so the modal can show an
+  // honest error (and fall back to the rating) instead of a spinner that never resolves.
+  const [questionError, setQuestionError] = useState(false);
   useEffect(() => {
-    if (!isOpen || !meetingExtId) { setQuestion(null); return undefined; }
+    if (!isOpen || !meetingExtId) { setQuestion(null); setQuestionError(false); return undefined; }
     const url = `${INGRESS_BASE}/public/a/bbb/exit-ticket/question/${meetingExtId}`;
     let cancelled = false;
+    setQuestionError(false);
     fetch(url)
       .then((res) => (res.ok
         ? res.json()
         : Promise.reject(new Error(`HTTP ${res.status} for ${meetingExtId}`))))
-      .then((data) => { if (!cancelled) setQuestion(data as unknown as ExitTicketQuestion); })
-      .catch(() => { if (!cancelled) setQuestion(null); });
+      .then((data) => { if (!cancelled) { setQuestion(data as unknown as ExitTicketQuestion); } })
+      .catch(() => { if (!cancelled) { setQuestion(null); setQuestionError(true); } });
     return () => { cancelled = true; };
   }, [isOpen, meetingExtId]);
 
@@ -96,6 +100,7 @@ export function useExitTicket(pluginUuid: string) {
     isModerator,
     isOpen,
     question,
+    questionError,
     startTicket,
     closeTicket,
     submitAnswer,

@@ -1,8 +1,19 @@
 import * as React from 'react';
 
 // Verified Fullmind tokens (Plus Jakarta Sans system); coral = selected, gray = idle.
-const CORAL = '#F37167';
-const GRAY = '#DEE2E6';
+const CORAL = '#F37167'; // Deep Coral 68 — selected border
+const CORAL_80 = '#F8A7A0'; // Deep Coral 80 — keyboard focus ring (system focus colour)
+const CORAL_90 = '#FBD3D0'; // Deep Coral 90 — selected fill (replaces a freelanced rgba)
+const GRAY = '#DEE2E6'; // Gray 300 — idle border
+
+// Hover + keyboard-focus states can't be expressed inline, so they live in one scoped
+// stylesheet. :focus-visible (not :focus) shows the ring for keyboard users only, not on
+// mouse click — the correct a11y behaviour. Injected once where the choices render.
+const CHOICE_CSS = `
+  .fm-et-choice { transition: border-color .12s ease, box-shadow .12s ease; }
+  .fm-et-choice:hover { border-color: ${CORAL}; }
+  .fm-et-choice:focus-visible { outline: none; box-shadow: 0 0 0 3px ${CORAL_80}; }
+`;
 
 /**
  * Per-type choice input. `s` = single (replace), `m` = multiple (toggle set membership).
@@ -25,22 +36,25 @@ export function ChoiceInput(
   };
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <style>{CHOICE_CSS}</style>
       {choices.map((c) => {
         const on = selected.includes(c.index);
         return (
           <button
             key={c.index}
             type="button"
+            className="fm-et-choice"
+            aria-pressed={on}
             onClick={() => toggle(c.index)}
             style={{
               textAlign: 'left',
-              padding: '12px 14px',
-              borderRadius: 14,
+              padding: '12px 16px',
+              borderRadius: 16,
+              // Selected = coral border + coral-90 fill (the "outline" is the border); the
+              // keyboard focus ring is layered on by .fm-et-choice:focus-visible above.
               border: `2px solid ${on ? CORAL : GRAY}`,
-              // Coral focus ring instead of the browser's default blue outline.
               outline: 'none',
-              boxShadow: on ? `0 0 0 1px ${CORAL}` : 'none',
-              background: on ? 'rgba(243,113,103,0.08)' : '#fff',
+              background: on ? CORAL_90 : '#fff',
               font: 'inherit',
               cursor: 'pointer',
               minHeight: 44, // 44px touch target (a11y)
