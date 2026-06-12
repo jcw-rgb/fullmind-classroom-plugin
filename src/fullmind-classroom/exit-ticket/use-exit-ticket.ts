@@ -91,6 +91,24 @@ export function useExitTicket(pluginUuid: string) {
     );
   }, [answers, me?.extId]);
 
+  // Type-'f' file upload: a binary can't ride the BBB data channel, so the student's
+  // browser POSTs it DIRECTLY to vidapi (multipart), authorized by the relayToken it
+  // already holds from the question fetch. The completion marker + rating still go
+  // through submitAnswer above (that's what drives the teacher's N-of-M count and the
+  // relay); the two converge server-side on the same (session, student) response row.
+  // No Content-Type header: the browser must set the multipart boundary itself.
+  const uploadFile = useCallback(async (file: File): Promise<void> => {
+    if (!question?.relayToken || !me?.extId) throw new Error('Exit ticket not ready');
+    const form = new FormData();
+    form.append('relayToken', question.relayToken);
+    form.append('file', file);
+    const res = await fetch(
+      `${INGRESS_BASE}/public/a/bbb/exit-ticket/file/${question.meetingId}/${me.extId}`,
+      { method: 'POST', body: form },
+    );
+    if (!res.ok) throw new Error(`File upload failed: HTTP ${res.status}`);
+  }, [question, me?.extId]);
+
   // Live count (teacher view): distinct extIds that have submitted an answer.
   const submittedExtIds = new Set(
     (answers?.data?.data ?? []).map((e) => e.payloadJson?.extId).filter(Boolean),
@@ -104,6 +122,7 @@ export function useExitTicket(pluginUuid: string) {
     startTicket,
     closeTicket,
     submitAnswer,
+    uploadFile,
     submittedCount: submittedExtIds.size,
     answersChannel: answers, // exposed for the relay loop (Task 4)
   };

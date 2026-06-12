@@ -69,6 +69,55 @@ export function ChoiceInput(
 }
 
 /**
+ * File picker for type-'f' questions. Controlled: holds no state, reports the chosen File
+ * via onChange. A hidden <input type="file"> behind a styled trigger button — the button
+ * reuses .fm-et-choice so hover/keyboard-focus match the choice boxes. Empty = dashed gray
+ * (an upload affordance); chosen = solid coral + coral-90 fill (mirrors a selected choice),
+ * showing the file name. Clicking again re-opens the picker to swap the file.
+ */
+export function FileInput(
+  { file, onChange }: { file: File | null; onChange: (f: File | null) => void },
+): React.ReactElement {
+  const inputRef = React.useRef<HTMLInputElement>(null);
+  return (
+    <div>
+      <style>{CHOICE_CSS}</style>
+      <input
+        ref={inputRef}
+        type="file"
+        style={{ display: 'none' }}
+        onChange={(e) => onChange(e.target.files?.[0] ?? null)}
+      />
+      <button
+        type="button"
+        className="fm-et-choice"
+        onClick={() => inputRef.current?.click()}
+        style={{
+          width: '100%',
+          textAlign: 'center',
+          padding: '12px 16px',
+          borderRadius: 16,
+          border: `2px ${file ? `solid ${CORAL}` : `dashed ${GRAY}`}`,
+          outline: 'none',
+          background: file ? CORAL_90 : '#fff',
+          font: 'inherit',
+          cursor: 'pointer',
+          minHeight: 44, // 44px touch target (a11y)
+          color: '#212529',
+        }}
+      >
+        {file ? file.name : 'Choose a file to upload'}
+      </button>
+      {file && (
+        <div style={{ marginTop: 4, fontSize: 12, color: '#6C757D' }}>
+          Click again to choose a different file.
+        </div>
+      )}
+    </div>
+  );
+}
+
+/**
  * 1–5 star rating. Controlled; reports the clicked value. Stars are filled up to `value`.
  * aria-label per star keeps it operable/testable without relying on the glyph.
  */

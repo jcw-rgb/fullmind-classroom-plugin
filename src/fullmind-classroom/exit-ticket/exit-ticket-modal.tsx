@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState } from 'react';
-import { ChoiceInput, StarRating } from './answer-inputs';
+import { ChoiceInput, FileInput, StarRating } from './answer-inputs';
 import { ExitTicketQuestion, AnswerEntry } from './constants';
 
 // Verified Fullmind tokens.
@@ -11,6 +11,7 @@ const CORAL_50 = '#EC2213'; // Deep Coral 50 — active
 const CORAL_80 = '#F8A7A0'; // Deep Coral 80 — focus ring
 const GRAY = '#DEE2E6'; // Gray 300 — disabled background / input border
 const GRAY_500 = '#ADB5BD'; // Gray 500 — disabled text
+const DANGER = '#E0182D'; // Danger 50 — error text
 const FONT = '"Plus Jakarta Sans", system-ui, sans-serif';
 
 // Submit interactive states (hover/active/keyboard-focus) — pseudo-classes can't be inline.
@@ -23,37 +24,65 @@ const SUBMIT_CSS = `
 /**
  * Student modal — a FloatingWindow-rendered overlay (the SDK has no true blocking modal).
  * Renders the right input for the question's response_type, plus an optional star rating,
- * and submits via the controller's submitAnswer. No Cancel: an exit ticket is required;
- * the teacher's `close` broadcast dismisses everyone.
+ * and submits via the controller's submitAnswer. Type-'f' uploads the file DIRECTLY to
+ * vidapi via onUploadFile first (a binary can't ride the data channel), then pushes the
+ * completion marker + rating through the normal channel. No Cancel: an exit ticket is
+ * required; the teacher's `close` broadcast dismisses everyone.
  */
 export function ExitTicketModal(
-  { question, error, onSubmit }: {
+  {
+    question, error, onSubmit, onUploadFile,
+  }: {
     question: ExitTicketQuestion | null;
     error: boolean;
     onSubmit: (answer: Omit<AnswerEntry, 'extId'>) => void;
+    onUploadFile: (file: File) => Promise<void>;
   },
 ): React.ReactElement {
   const [choices, setChoices] = useState<string[]>([]);
   const [text, setText] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [rating, setRating] = useState(0);
   const [submitted, setSubmitted] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(false);
 
   const rt = question?.response_type;
   // With no question loaded, the student can still submit a rating. With a question,
-  // require its answer (text for 't', a choice for 's'/'m').
+  // require its answer (text for 't', a choice for 's'/'m', a file for 'f').
   const canSubmit = ((): boolean => {
+    if (uploading) return false;
     if (rt === 't') return text.trim().length > 0;
     if (rt === 's' || rt === 'm') return choices.length > 0;
+    if (rt === 'f') return file !== null;
     return rating > 0;
   })();
 
-  const submit = () => {
+  // The channel payload: the completion marker + rating (and the answer for non-file
+  // types). For 'f' the file itself is already at the LMS by the time this is pushed.
+  const pushAnswer = () => {
     const answer: Omit<AnswerEntry, 'extId'> = {};
     if (rt === 't') answer.text = text.trim();
     else if (rt === 's' || rt === 'm') answer.choices = choices;
     if (rating > 0) answer.rating = rating;
     onSubmit(answer);
     setSubmitted(true);
+  };
+
+  const submit = () => {
+    if (rt === 'f') {
+      if (!file) return;
+      setUploading(true);
+      setUploadError(false);
+      // Upload first; only mark complete once the file is safely at the server. On
+      // failure keep the form (file still selected) so the student can just retry.
+      onUploadFile(file)
+        .then(() => pushAnswer())
+        .catch(() => setUploadError(true))
+        .finally(() => setUploading(false));
+      return;
+    }
+    pushAnswer();
   };
 
   return (
@@ -112,15 +141,18 @@ export function ExitTicketModal(
                   }}
                 />
               )}
-              {/* File type 'f' is deferred (Task 5 — needs the pre-signed-S3 sub-spec). Render an
-                  honest placeholder rather than a silently un-submittable empty body. */}
               {rt === 'f' && (
-                <p style={{ margin: 0, color: '#6C757D', fontSize: 14 }}>File upload is coming soon.</p>
+                <FileInput file={file} onChange={setFile} />
               )}
               <div style={{ marginTop: 16 }}>
                 <div style={{ fontSize: 12, color: '#6C757D', marginBottom: 4 }}>Rate today&apos;s lesson</div>
                 <StarRating value={rating} onChange={setRating} />
               </div>
+              {uploadError && (
+                <p style={{ margin: '12px 0 0', fontSize: 14, color: DANGER }}>
+                  Couldn&apos;t upload your file — please try submitting again.
+                </p>
+              )}
               <div style={{
                 display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 20,
               }}
@@ -144,7 +176,7 @@ export function ExitTicketModal(
                     minHeight: 44,
                   }}
                 >
-                  Submit exit ticket
+                  {uploading ? 'Uploading…' : 'Submit exit ticket'}
                 </button>
               </div>
             </>

@@ -43,6 +43,7 @@ function ExitTicketView({ pluginUuid }: { pluginUuid: string }): React.ReactElem
       question={et.question}
       error={et.questionError}
       onSubmit={et.submitAnswer}
+      onUploadFile={et.uploadFile}
     />
   );
 }
